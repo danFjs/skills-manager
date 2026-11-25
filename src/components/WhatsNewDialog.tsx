@@ -165,7 +165,7 @@ export function WhatsNewOnUpdate() {
           current,
           lastSeen: lastSeen || null,
           hasLibrary,
-          loadEntries: () => loadChangelog(i18n.language),
+          loadEntries: () => loadChangelog(),
         });
         if (decision.record === "now") {
           await api.setSettings(WHATS_NEW_SEEN_KEY, current);

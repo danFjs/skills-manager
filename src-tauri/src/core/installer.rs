@@ -200,7 +200,7 @@ pub fn install_skill_dir_to_destination(
 
 /// Extract a ZIP archive into `dest`, skipping any entry whose path would
 /// escape the destination directory (Zip Slip defence).
-fn safe_extract(archive: &mut zip::ZipArchive<std::fs::File>, dest: &Path) -> Result<()> {
+pub(crate) fn safe_extract(archive: &mut zip::ZipArchive<std::fs::File>, dest: &Path) -> Result<()> {
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
 

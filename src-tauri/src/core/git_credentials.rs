@@ -266,16 +266,6 @@ pub fn credential_env_for_url(url: &str) -> Vec<(String, String)> {
     ]
 }
 
-/// Route all keyring access in this test process to keyring's in-memory mock
-/// store, so tests never touch the developer's real OS keychain.
-#[cfg(test)]
-pub(crate) fn use_mock_keyring() {
-    static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| {
-        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
-    });
-}
-
 #[cfg(test)]
 mod tests {
     /// The regression #379 reports: libgit2 got `None` for callbacks and

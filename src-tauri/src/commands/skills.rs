@@ -3713,8 +3713,6 @@ pub async fn batch_import_folder(
 ) -> Result<BatchImportResult, AppError> {
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        use tauri::Emitter;
-
         let root = PathBuf::from(&folder_path);
         if !root.is_dir() {
             return Err(AppError::invalid_input("Selected path is not a directory"));
@@ -3730,72 +3728,89 @@ pub async fn batch_import_folder(
             }
         }
 
-        if skill_dirs.is_empty() {
-            return Ok(BatchImportResult {
-                imported: 0,
-                skipped: 0,
-                errors: vec![],
-            });
-        }
-
-        let total = skill_dirs.len();
-        let mut imported = 0usize;
-        let mut skipped = 0usize;
-        let mut errors = Vec::new();
-
-        for (i, dir) in skill_dirs.iter().enumerate() {
-            let name = skill_metadata::infer_skill_name(dir);
-
-            app_handle
-                .emit(
-                    "batch-import-progress",
-                    serde_json::json!({
-                        "current": i + 1,
-                        "total": total,
-                        "name": &name,
-                    }),
-                )
-                .ok();
-
-            // Check if already imported by prospective central path
-            let prospective_central = central_repo::skills_dir().join(&name);
-            let central_str = prospective_central.to_string_lossy().to_string();
-            if let Ok(Some(_)) = store.get_skill_by_central_path(&central_str) {
-                skipped += 1;
-                continue;
-            }
-
-            let install_result = (|| -> Result<String, AppError> {
-                let _lock =
-                    RepoLock::acquire_foreground("batch import skill").map_err(AppError::db)?;
-                let result =
-                    installer::install_from_local(dir, Some(&name)).map_err(AppError::io)?;
-                let metadata = InstallSourceMetadata {
-                    source_type: "local".to_string(),
-                    source_ref: Some(dir.to_string_lossy().to_string()),
-                    source_ref_resolved: None,
-                    source_subpath: None,
-                    source_branch: None,
-                    source_revision: None,
-                    remote_revision: None,
-                    update_status: "local_only".to_string(),
-                };
-                store_installed_skill_unlocked(&store, &result, &metadata, None)
-            })();
-
-            match install_result {
-                Ok(_) => imported += 1,
-                Err(e) => errors.push(format!("{}: {}", name, e)),
-            }
-        }
-
-        Ok(BatchImportResult {
-            imported,
-            skipped,
-            errors,
-        })
+        Ok(import_skill_dirs(&store, &app_handle, &skill_dirs, None))
     })
     .await?
+}
+
+/// Import each skill folder into the library, skipping names already
+/// there, with `batch-import-progress` events. Shared by folder import and
+/// archive import; `source_ref` overrides the recorded source (an archive
+/// path instead of its temp extraction folder).
+pub(crate) fn import_skill_dirs(
+    store: &Arc<SkillStore>,
+    app_handle: &tauri::AppHandle,
+    skill_dirs: &[PathBuf],
+    source_ref: Option<String>,
+) -> BatchImportResult {
+    use tauri::Emitter;
+
+    if skill_dirs.is_empty() {
+        return BatchImportResult {
+            imported: 0,
+            skipped: 0,
+            errors: vec![],
+        };
+    }
+
+    let total = skill_dirs.len();
+    let mut imported = 0usize;
+    let mut skipped = 0usize;
+    let mut errors = Vec::new();
+
+    for (i, dir) in skill_dirs.iter().enumerate() {
+        let name = skill_metadata::infer_skill_name(dir);
+
+        app_handle
+            .emit(
+                "batch-import-progress",
+                serde_json::json!({
+                    "current": i + 1,
+                    "total": total,
+                    "name": &name,
+                }),
+            )
+            .ok();
+
+        // Check if already imported by prospective central path
+        let prospective_central = central_repo::skills_dir().join(&name);
+        let central_str = prospective_central.to_string_lossy().to_string();
+        if let Ok(Some(_)) = store.get_skill_by_central_path(&central_str) {
+            skipped += 1;
+            continue;
+        }
+
+        let install_result = (|| -> Result<String, AppError> {
+            let _lock =
+                RepoLock::acquire_foreground("batch import skill").map_err(AppError::db)?;
+            let result =
+                installer::install_from_local(dir, Some(&name)).map_err(AppError::io)?;
+            let metadata = InstallSourceMetadata {
+                source_type: "local".to_string(),
+                source_ref: source_ref
+                    .clone()
+                    .or_else(|| Some(dir.to_string_lossy().to_string())),
+                source_ref_resolved: None,
+                source_subpath: None,
+                source_branch: None,
+                source_revision: None,
+                remote_revision: None,
+                update_status: "local_only".to_string(),
+            };
+            store_installed_skill_unlocked(store, &result, &metadata, None)
+        })();
+
+        match install_result {
+            Ok(_) => imported += 1,
+            Err(e) => errors.push(format!("{}: {}", name, e)),
+        }
+    }
+
+    BatchImportResult {
+        imported,
+        skipped,
+        errors,
+    }
 }
 
 fn remove_path_if_exists(path: &Path) -> Result<(), AppError> {

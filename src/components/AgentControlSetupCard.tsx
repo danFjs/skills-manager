@@ -7,7 +7,7 @@ import { getErrorMessage } from "../lib/error";
 import * as api from "../lib/tauri";
 import { AgentIcon } from "./AgentIcon";
 
-/** Dismissal flag, same shape as the backup first-run prompt. */
+/** Dismissal flag for this setup card. */
 const PROMPT_SETTING_KEY = "agent_control_setup_prompt";
 
 /** The library skill that teaches an agent to drive Skills Manager. */

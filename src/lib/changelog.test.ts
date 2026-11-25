@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import changelogEn from "../../CHANGELOG.md?raw";
-import changelogZh from "../../CHANGELOG-zh.md?raw";
 import packageJson from "../../package.json?raw";
 import {
   MAX_WHATS_NEW_ENTRIES,
@@ -30,14 +29,14 @@ Intro text.
 
 ## [1.9.0] - 2026-03-01
 
-### 发布概览
-- 九。
+### Release Overview
+- Nine.
 
-### 用户可见更新
-- 中文条目。
+### User-facing
+- Nine's item.
 
-### 开发者与治理更新
-- 内部重构。
+### Developer & Governance
+- Nine's refactor.
 
 ## [1.8.0] - 2026-02-01
 
@@ -64,14 +63,14 @@ describe("parseChangelog", () => {
       overview: "- Ten is here.",
       userFacing: "- **Big thing** — it works.\n- Small thing.",
     });
-    expect(entries[1].overview).toBe("- 九。");
-    expect(entries[1].userFacing).toBe("- 中文条目。");
+    expect(entries[1].overview).toBe("- Nine.");
+    expect(entries[1].userFacing).toBe("- Nine's item.");
   });
 
   it("ignores the developer section", () => {
     const all = entries.map((e) => e.overview + e.userFacing).join("\n");
     expect(all).not.toContain("Internal refactor");
-    expect(all).not.toContain("内部重构");
+    expect(all).not.toContain("Nine's refactor");
     expect(entries[2].userFacing).toBe("");
   });
 
@@ -88,8 +87,8 @@ describe("parseChangelog", () => {
       "### User-facing", "- ", "",
       "### Developer & Governance", "- ", "",
       "## [1.9.0] - 2026-11-01", "",
-      "### 发布概览", "-", "",
-      "### 用户可见更新", "- ", "", "",
+      "### Release Overview", "-", "",
+      "### User-facing", "- ", "", "",
       "## [1.8.0] - 2026-10-01", "",
       "### User-facing", "- Real item.", "- ", "",
     ].join("\n");
@@ -218,30 +217,19 @@ function recentHeadings(markdown: string): string[] {
     .map((line) => line.slice(4).trim());
 }
 
-describe("the real CHANGELOG files", () => {
+describe("the real CHANGELOG file", () => {
   const en = parseChangelog(changelogEn);
-  const zh = parseChangelog(changelogZh);
   const current = (JSON.parse(packageJson) as { version: string }).version;
 
-  it("list the same releases in both languages", () => {
+  it("lists enough releases and the current version", () => {
     expect(en.length).toBeGreaterThan(RECENT_RELEASES);
-    expect(en.map((e) => `${e.version} ${e.date}`)).toEqual(zh.map((e) => `${e.version} ${e.date}`));
-  });
-
-  it("have the current version in both languages", () => {
     expect(en.map((e) => e.version)).toContain(current);
-    expect(zh.map((e) => e.version)).toContain(current);
   });
 
-  it("use only the known section headings in recent releases", () => {
-    for (const [markdown, titles] of [
-      [changelogEn, SECTION_TITLES.en],
-      [changelogZh, SECTION_TITLES.zh],
-    ] as const) {
-      const known: string[] = Object.values(titles);
-      const headings = recentHeadings(markdown);
-      expect(headings.length).toBeGreaterThan(0);
-      expect(headings.filter((heading) => !known.includes(heading))).toEqual([]);
-    }
+  it("uses only the known section headings in recent releases", () => {
+    const known: string[] = Object.values(SECTION_TITLES.en);
+    const headings = recentHeadings(changelogEn);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings.filter((heading) => !known.includes(heading))).toEqual([]);
   });
 });

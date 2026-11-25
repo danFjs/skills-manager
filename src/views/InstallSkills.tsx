@@ -24,6 +24,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { SkillRepoCollections } from "../components/SkillRepoCollections";
 import { toast } from "sonner";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
@@ -472,10 +473,13 @@ export function InstallSkills() {
     });
   };
 
-  const handleGitPreview = async () => {
-    if (!gitUrl.trim()) return;
+  /** Preview a repo's skills. `repoUrl` comes from the collections list;
+   *  otherwise the typed URL is used. */
+  const handleGitPreview = async (repoUrl?: string) => {
+    const url = (repoUrl ?? gitUrl).trim();
+    if (!url) return;
+    if (repoUrl) setGitUrl(repoUrl);
     setGitLoading(true);
-    const url = gitUrl.trim();
     setGitCancelKey(url);
 
     const toastId = toast.loading(t("install.toast.cloning"));
@@ -1503,7 +1507,7 @@ export function InstallSkills() {
                   </button>
                 ) : (
                   <button
-                    onClick={handleGitPreview}
+                    onClick={() => handleGitPreview()}
                     disabled={!gitUrl.trim()}
                     className={cn(
                       "flex w-full",
@@ -1521,6 +1525,7 @@ export function InstallSkills() {
               </div>
             </div>
           </div>
+          <SkillRepoCollections onBrowse={(url) => handleGitPreview(url)} disabled={gitLoading} />
         </div>
       )}
 

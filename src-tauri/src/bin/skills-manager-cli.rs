@@ -4,12 +4,11 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow, bail};
 use app_lib::commands::{
-    git_backup as git_cmd, presets as preset_cmd, projects as project_cmd, skills as cmd,
-    tools as tool_cmd,
+    presets as preset_cmd, projects as project_cmd, skills as cmd, tools as tool_cmd,
 };
 use app_lib::core::{
-    app_state, audit_log::AuditDraft, central_repo, error::AppError, git_backup, git_fetcher,
-    installer, merge, path_guard, repo_lock::RepoLock, scenario_service, skill_metadata,
+    app_state, audit_log::AuditDraft, central_repo, error::AppError, git_fetcher,
+    installer, path_guard, repo_lock::RepoLock, scenario_service, skill_metadata,
     skill_store::SkillStore, skillssh_api, sync_engine, sync_metadata, tool_adapters, tool_service,
     well_known,
 };
@@ -36,7 +35,6 @@ enum Commands {
     Skills(SkillsArgs),
     #[command(alias = "scenarios")]
     Presets(PresetArgs),
-    Git(GitArgs),
     Projects(ProjectsArgs),
 }
 
@@ -443,40 +441,6 @@ enum ProjectsCommand {
     },
 }
 
-#[derive(Args, Debug)]
-struct GitArgs {
-    #[command(subcommand)]
-    command: GitCommand,
-}
-
-#[derive(Subcommand, Debug)]
-enum GitCommand {
-    Status,
-    Init,
-    Clone {
-        url: String,
-    },
-    SetRemote {
-        url: String,
-    },
-    Pull,
-    Push,
-    Commit {
-        #[arg(short, long)]
-        message: String,
-    },
-    Versions {
-        #[arg(long)]
-        limit: Option<usize>,
-    },
-    Restore {
-        tag: String,
-    },
-    /// Remove refs/skills-manager/* that a `git push --mirror`/--all style
-    /// operation uploaded to the backup remote. Local sync refs are kept.
-    PruneSyncRefs,
-}
-
 #[derive(Debug, Serialize)]
 struct RepoStatus {
     base_dir: String,
@@ -827,7 +791,6 @@ fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Tools(args) => run_tools(args, &store, cli.json),
         Commands::Skills(args) => run_skills(args, &store, cli.json),
         Commands::Presets(args) => run_presets(args, &store, cli.json),
-        Commands::Git(args) => run_git(args, &store, cli.skills_root.is_some(), cli.json),
         Commands::Projects(args) => run_projects(args, &store, cli.json),
     }
 }
@@ -3740,78 +3703,6 @@ fn import_from_project(
 }
 
 // ── git ───────────────────────────────────────────────────────────────────
-
-fn run_git(
-    args: GitArgs,
-    store: &SkillStore,
-    has_skills_root: bool,
-    json: bool,
-) -> anyhow::Result<()> {
-    // The app applies the saved git engine (git2 / system) and proxy before
-    // anything that can reach the network; the CLI does the same.
-    git_cmd::sync_engine_pref(store);
-    match args.command {
-        GitCommand::Status => {
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json)
-        }
-        GitCommand::Init => {
-            git_cmd::init_backup_repo(store)?;
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json);
-        }
-        GitCommand::Clone { url } => {
-            // `--skills-root` may point anywhere, so a populated folder that is
-            // not a repo is refused rather than merged into the clone.
-            git_cmd::clone_backup(store, &url, has_skills_root)?;
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json);
-        }
-        GitCommand::SetRemote { url } => {
-            git_cmd::set_backup_remote(store, &url)?;
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json);
-        }
-        GitCommand::Pull => {
-            // Same engine gate as the GUI sync (object merge by default,
-            // merge_engine=system opts out). A raw line merge from this CLI
-            // would read as an old-client violation on other devices (§6).
-            let dir = central_repo::skills_dir();
-            {
-                let _lock = RepoLock::acquire_foreground("git pull")?;
-                let device = store
-                    .get_setting("backup_device_name")
-                    .ok()
-                    .flatten()
-                    .map(|v| git_backup::sanitize_device_name(&v))
-                    .filter(|v| !v.is_empty())
-                    .unwrap_or_else(git_backup::default_device_name);
-                let _ = git_backup::configure_device_identity(&dir, &device);
-                merge::gated_pull_unlocked(store, &dir)?;
-            }
-            // Reconcile the DB from the merged metadata (takes its own lock).
-            sync_metadata::reindex_from_metadata(store)?;
-            print_json(&git_backup::get_status(&dir)?, json);
-        }
-        GitCommand::Push => {
-            git_backup::push(&central_repo::skills_dir())?;
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json);
-        }
-        GitCommand::Commit { message } => {
-            let tag = git_cmd::commit_backup_snapshot(store, &message)?;
-            print_json(&serde_json::json!({"ok": true, "tag": tag}), json);
-        }
-        GitCommand::Versions { limit } => print_json(
-            &git_backup::list_snapshot_versions(&central_repo::skills_dir(), limit)?,
-            json,
-        ),
-        GitCommand::Restore { tag } => {
-            git_cmd::restore_backup_version(store, &tag)?;
-            print_json(&git_backup::get_status(&central_repo::skills_dir())?, json);
-        }
-        GitCommand::PruneSyncRefs => {
-            let removed = git_backup::prune_hidden_refs_on_remote(&central_repo::skills_dir())?;
-            print_json(&serde_json::json!({ "removed": removed }), json);
-        }
-    }
-    Ok(())
-}
 
 // ── helpers ───────────────────────────────────────────────────────────────
 

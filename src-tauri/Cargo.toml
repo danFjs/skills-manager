@@ -27,7 +27,6 @@ tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
-tauri-plugin-updater = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -41,7 +40,6 @@ caseless = "0.2"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 anyhow = "1.0"
 chrono = "0.4"
-gethostname = "1"
 serde_yaml = "0.9"
 git2 = { version = "0.19", features = ["vendored-openssl"] }
 tokio = { version = "1", features = ["full"] }
@@ -50,7 +48,6 @@ hex = "0.4"
 urlencoding = "2"
 zip = "2"
 tempfile = "3.26.0"
-semver = "1"
 aes-gcm = "0.10"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
 rand = "0.8"

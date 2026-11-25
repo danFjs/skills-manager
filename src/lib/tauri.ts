@@ -508,20 +508,6 @@ export const hideToTray = () => invoke<void>("hide_to_tray");
 export const openCentralRepoFolder = () =>
   invoke<void>("open_central_repo_folder");
 
-export interface AppUpdateInfo {
-  has_update: boolean;
-  current_version: string;
-  latest_version: string;
-  release_url: string;
-}
-
-export const checkAppUpdate = () =>
-  invoke<AppUpdateInfo>("check_app_update");
-
-/** Non-null when the app runs from somewhere an in-app update cannot be applied. */
-export const updateInstallBlocker = () =>
-  invoke<string | null>("update_install_blocker");
-
 export const restartApp = () => invoke<void>("restart_app");
 
 export interface DiagnosticInfo {
@@ -574,202 +560,31 @@ export const clearLastPanic = () =>
 export const logStartupEvent = (label: string, elapsedMs: number) =>
   invoke<void>("log_startup_event", { label, elapsedMs: Math.round(elapsedMs) });
 
-// ── Git Backup ──
+// ── Local sharing ──
 
-export type GitUpstreamHealth =
-  | "healthy"
-  | "no_remote"
-  | "no_upstream"
-  | "unrelated_histories"
-  | "detached";
-
-export interface GitBackupStatus {
-  is_repo: boolean;
-  remote_url: string | null;
-  branch: string | null;
-  has_changes: boolean;
-  changed_skill_count: number;
-  ahead: number;
-  behind: number;
-  last_commit: string | null;
-  last_commit_time: string | null;
-  current_snapshot_tag: string | null;
-  restored_from_tag: string | null;
-  upstream_health: GitUpstreamHealth;
+export interface ShareSummary {
+  skills: number;
+  files: number;
+  bytes: number;
 }
 
-export interface GitBackupVersion {
-  tag: string;
-  commit: string;
-  message: string;
-  committed_at: string;
-  /** Device name of the machine that made this backup (empty for old commits). */
-  author: string;
+/** Pack library skills (all of them for an empty list) into one zip. */
+export const exportSkillsArchive = (skillIds: string[], destPath: string) =>
+  invoke<ShareSummary>("export_skills_archive", { skillIds, destPath });
+
+/** Import every skill in a shared zip; names already in the library are skipped. */
+export const importSkillsArchive = (archivePath: string) =>
+  invoke<BatchImportResult>("import_skills_archive", { archivePath });
+
+export interface AdoptSummary {
+  adopted: number;
+  backup_dir: string | null;
+  errors: string[];
 }
 
-export interface GitBackupSizeReport {
-  total_bytes: number;
-  /** `excluded`: oversized and kept out of the backup (§3.6); false = already tracked, warning only. */
-  oversized: { name: string; bytes: number; excluded: boolean }[];
-  skill_limit_bytes: number;
-  repo_warn_bytes: number;
-}
-
-export const gitBackupStatus = () =>
-  invoke<GitBackupStatus>("git_backup_status");
-
-export const gitBackupFetch = () => invoke<void>("git_backup_fetch");
-
-export const gitBackupInit = () => invoke<void>("git_backup_init");
-
-/** Returns the sanitized URL actually configured (credentials moved to the OS keychain). */
-export const gitBackupSetRemote = (url: string) =>
-  invoke<string>("git_backup_set_remote", { url });
-
-/** Strip embedded credentials into the OS keychain; returns the URL safe to persist. */
-export const gitBackupSanitizeRemoteUrl = (url: string) =>
-  invoke<string>("git_backup_sanitize_remote_url", { url });
-
-export interface GithubBackupConnectResult {
-  url: string;
-  login: string;
-  repo_created: boolean;
-  /** False when a pre-existing PUBLIC repository was connected. */
-  repo_private: boolean;
-  remote_has_content: boolean;
-}
-
-/** GitHub guided connect (PAT): validates the token, finds or creates the
- * private backup repo, stores the token in the OS keychain, saves the URL. */
-export const githubBackupConnect = (token: string, repoName: string) =>
-  invoke<GithubBackupConnectResult>("github_backup_connect", { token, repoName });
-
-export interface GithubDeviceFlowStart {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  expires_in: number;
-  interval: number;
-}
-
-export interface GithubDevicePollResult {
-  status: "pending" | "slow_down" | "connected";
-  result: GithubBackupConnectResult | null;
-}
-
-export const githubDeviceFlowStart = () =>
-  invoke<GithubDeviceFlowStart>("github_device_flow_start");
-
-/** One poll; on authorization the backend completes the whole connect and the
- * OAuth token never reaches the webview. */
-export const githubDeviceFlowPoll = (deviceCode: string, repoName: string) =>
-  invoke<GithubDevicePollResult>("github_device_flow_poll", { deviceCode, repoName });
-
-/** Migrate token-in-URL remotes to the OS keychain. Returns the sanitized URL if migrated. */
-export const gitBackupMigrateCredentials = () =>
-  invoke<string | null>("git_backup_migrate_credentials");
-
-export const gitBackupSizeReport = () =>
-  invoke<GitBackupSizeReport>("git_backup_size_report");
-
-/** This machine's device name (§4.3): saved setting or persisted hostname default. */
-export const backupDeviceName = () => invoke<string>("backup_device_name");
-
-/** Rename this device; only affects future backups. Returns the sanitized name. */
-export const backupSetDeviceName = (name: string) =>
-  invoke<string>("backup_set_device_name", { name });
-
-export const gitBackupRemoveRemote = () =>
-  invoke<void>("git_backup_remove_remote");
-
-export const gitBackupCommit = (message: string) =>
-  invoke<void>("git_backup_commit", { message });
-
-export const gitBackupPush = () => invoke<void>("git_backup_push");
-
-export interface MergeUpdatedSkill {
-  skill_id: string;
-  path: string;
-  /** Device (commit author) that last touched this skill on the remote. */
-  from_device: string;
-}
-
-/** Outcome of a sync merge (merge-engine design §8). With the default
- * system engine only `engine` is meaningful. */
-export interface MergeSummary {
-  engine: "object" | "system";
-  up_to_date: boolean;
-  fast_forward: boolean;
-  updated: MergeUpdatedSkill[];
-  kept_local: string[];
-  new_conflicts: string[];
-  pending_total: number;
-  old_client_warning: string | null;
-  legacy_fallback: boolean;
-}
-
-export const gitBackupPull = () => invoke<MergeSummary>("git_backup_pull");
-
-/** Outcome of the one-transaction sync (commit → merge → snapshot → push,
- * with automatic retry when another device pushes concurrently). */
-export interface SyncOutcome {
-  committed: boolean;
-  merge: MergeSummary | null;
-  pushed: boolean;
-  snapshot_tag: string | null;
-}
-
-export const gitBackupSync = (message: string) =>
-  invoke<SyncOutcome>("git_backup_sync", { message });
-
-/** One "needs attention" sync conflict (merge-engine design §4). */
-export interface PendingConflict {
-  skill_id: string;
-  theirs_commit: string;
-  theirs_path: string | null;
-  detected_at: number;
-}
-
-export const gitBackupPendingConflicts = () =>
-  invoke<PendingConflict[]>("git_backup_pending_conflicts");
-
-export type ResolveConflictAction = "keep_local" | "use_remote" | "keep_both";
-
-/** Resolve a pending conflict; returns the safety snapshot tag. */
-export const gitBackupResolveConflict = (
-  skillId: string,
-  action: ResolveConflictAction,
-) => invoke<string>("git_backup_resolve_conflict", { skillId, action });
-
-/** Local skills that differ from the remote's same-named copies stop the
- *  clone (`CLONE_LOCAL_DIFFERS`) unless `setAside` is exactly that list, as
- *  the user confirmed it: their local versions are then saved to a folder
- *  beside the library, which this resolves to (otherwise `null`). */
-export const gitBackupClone = (url: string, setAside: string[] = []) =>
-  invoke<string | null>("git_backup_clone", { url, setAside });
-
-/** What a re-clone left beside the library: the previous `.git` when its
- *  history could not be proven to be on the remote, and the set-aside local
- *  versions (see `gitBackupClone`). */
-export interface RecloneResult {
-  kept_git: string | null;
-  local_copies: string | null;
-}
-
-export const gitBackupReclone = (url: string, setAside: string[] = []) =>
-  invoke<RecloneResult>("git_backup_reclone", { url, setAside });
-
-export const gitBackupCreateSnapshot = () =>
-  invoke<string>("git_backup_create_snapshot");
-
-export const gitBackupListVersions = (limit?: number) =>
-  invoke<GitBackupVersion[]>("git_backup_list_versions", {
-    limit: typeof limit === "number" ? limit : null,
-  });
-
-/** Returns the safety-point tag that captured the pre-restore state. */
-export const gitBackupRestoreVersion = (tag: string) =>
-  invoke<string>("git_backup_restore_version", { tag });
+/** Import every plain-folder skill from the agents' skills directories and
+ *  replace each with a link to the library copy (originals are backed up). */
+export const adoptAgentSkills = () => invoke<AdoptSummary>("adopt_agent_skills");
 
 // ── Presets ──
 

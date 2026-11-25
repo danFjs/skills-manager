@@ -8,7 +8,7 @@
     "dev": "vite",
     "test": "vitest run",
     "build": "tsc -b && vite build",
-    "lint": "eslint . && node scripts/check-ui-spec.mjs && node scripts/check-i18n.mjs",
+    "lint": "eslint . && node scripts/check-ui-spec.mjs",
     "preview": "vite preview",
     "release:prepare": "node scripts/prepare-release.mjs",
     "tauri": "tauri",

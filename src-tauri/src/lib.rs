@@ -782,11 +782,6 @@ fn teardown_before_exit(app: &tauri::AppHandle) {
             log::error!("Failed to destroy main window while quitting: {err}");
         }
     }
-    // 退出前 auto-backup (§3.4): local commit only, fail-fast on a busy lock,
-    // after the window is gone so quitting feels instant.
-    if let Some(store) = app.try_state::<Arc<core::skill_store::SkillStore>>() {
-        core::auto_backup::commit_on_exit(&store);
-    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -810,7 +805,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
@@ -933,33 +927,34 @@ pub fn run() {
                 step.elapsed().as_millis()
             );
 
-            // Object-merge crash recovery (merge-engine design §5): finish or
-            // roll back an interrupted sync apply before any background work
-            // can touch the repo. Best-effort, never blocks startup.
-            let store_for_merge_recovery = store_for_setup.clone();
+            // Fork: adopt skills that live as plain folders in agent skill
+            // directories — import them into the library and replace each
+            // with a link to it. On by default; `auto_adopt_skills = false`
+            // turns it off. Originals are backed up first (see
+            // `adopt_all_agent_skills`).
+            let store_for_adopt = store_for_setup.clone();
+            let app_for_adopt = app.handle().clone();
             tauri::async_runtime::spawn_blocking(move || {
-                core::merge::recover_on_startup(
-                    &store_for_merge_recovery,
-                    &core::central_repo::skills_dir(),
-                );
-            });
-
-            // Automatic backup (§3.4): debounced commit+push after central-repo
-            // changes; the first round also uploads whatever the exit-time
-            // commit captured last session.
-            core::auto_backup::start(app.handle().clone(), store_for_setup.clone());
-
-            // One-time (idempotent) security migration: move credentials
-            // embedded in the backup remote URL into the OS keychain so no
-            // token stays in `.git/config`. Best-effort in the background —
-            // offline machines retry on the next launch.
-            let store_for_cred_migration = store_for_setup.clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                match commands::git_backup::migrate_embedded_credentials(&store_for_cred_migration)
-                {
-                    Ok(Some(_)) => log::info!("startup: migrated backup token to OS keychain"),
-                    Ok(None) => {}
-                    Err(e) => log::warn!("startup: backup credential migration skipped: {e:#}"),
+                use tauri::Emitter;
+                let enabled = store_for_adopt
+                    .get_setting("auto_adopt_skills")
+                    .ok()
+                    .flatten()
+                    .map_or(true, |v| v.trim() != "false");
+                if !enabled {
+                    return;
+                }
+                match commands::agent_workspace::adopt_all_agent_skills(&store_for_adopt) {
+                    Ok(summary) if summary.adopted > 0 || !summary.errors.is_empty() => {
+                        log::info!(
+                            "startup: adopted {} agent skill(s), {} error(s)",
+                            summary.adopted,
+                            summary.errors.len()
+                        );
+                        let _ = app_for_adopt.emit("skills-adopted", &summary);
+                    }
+                    Ok(_) => {}
+                    Err(e) => log::warn!("startup: skill adoption skipped: {e}"),
                 }
             });
 
@@ -1043,6 +1038,8 @@ pub fn run() {
             commands::skills::delete_tag,
             commands::skills::cancel_install,
             commands::skills::batch_import_folder,
+            commands::share::export_skills_archive,
+            commands::share::import_skills_archive,
             // Sync
             commands::sync::sync_skill_to_tool,
             commands::sync::unsync_skill_from_tool,
@@ -1064,8 +1061,6 @@ pub fn run() {
             commands::settings::get_central_repo_warnings,
             commands::settings::set_central_repo_path,
             commands::settings::open_central_repo_folder,
-            commands::settings::check_app_update,
-            commands::settings::update_install_blocker,
             commands::settings::get_diagnostic_info,
             commands::settings::get_recent_log_excerpt,
             commands::settings::export_logs_zip,
@@ -1076,30 +1071,6 @@ pub fn run() {
             commands::settings::restart_app,
             commands::settings::hide_to_tray,
             // Git Backup
-            commands::git_backup::git_backup_fetch,
-            commands::git_backup::git_backup_status,
-            commands::git_backup::git_backup_init,
-            commands::git_backup::git_backup_set_remote,
-            commands::git_backup::github_backup_connect,
-            commands::git_backup::github_device_flow_start,
-            commands::git_backup::github_device_flow_poll,
-            commands::git_backup::git_backup_sanitize_remote_url,
-            commands::git_backup::git_backup_migrate_credentials,
-            commands::git_backup::git_backup_size_report,
-            commands::git_backup::git_backup_remove_remote,
-            commands::git_backup::git_backup_commit,
-            commands::git_backup::git_backup_push,
-            commands::git_backup::git_backup_pull,
-            commands::git_backup::git_backup_clone,
-            commands::git_backup::git_backup_reclone,
-            commands::git_backup::git_backup_create_snapshot,
-            commands::git_backup::git_backup_list_versions,
-            commands::git_backup::git_backup_restore_version,
-            commands::git_backup::backup_device_name,
-            commands::git_backup::backup_set_device_name,
-            commands::git_backup::git_backup_pending_conflicts,
-            commands::git_backup::git_backup_resolve_conflict,
-            commands::git_backup::git_backup_sync,
             // Projects
             commands::projects::get_projects,
             commands::projects::add_project,
@@ -1121,6 +1092,7 @@ pub fn run() {
             commands::agent_workspace::get_global_local_skills,
             commands::agent_workspace::get_global_local_skill_document,
             commands::agent_workspace::import_global_local_skill_to_center,
+            commands::agent_workspace::adopt_agent_skills,
             commands::agent_workspace::update_global_local_skill_from_center,
             commands::agent_workspace::delete_global_local_skill,
             // Presets

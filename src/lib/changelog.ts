@@ -35,10 +35,9 @@ const SECTION_HEADING = /^### (.+?)\s*$/;
  */
 export const SECTION_TITLES = {
   en: { overview: "Release Overview", userFacing: "User-facing", developer: "Developer & Governance" },
-  zh: { overview: "发布概览", userFacing: "用户可见更新", developer: "开发者与治理更新" },
 } as const;
-const OVERVIEW_TITLES = new Set<string>([SECTION_TITLES.en.overview, SECTION_TITLES.zh.overview]);
-const USER_FACING_TITLES = new Set<string>([SECTION_TITLES.en.userFacing, SECTION_TITLES.zh.userFacing]);
+const OVERVIEW_TITLES = new Set<string>([SECTION_TITLES.en.overview]);
+const USER_FACING_TITLES = new Set<string>([SECTION_TITLES.en.userFacing]);
 
 /** A line of the release template's placeholder: a list item with no text. */
 const EMPTY_LIST_ITEM = /^\s*-\s*$/;
@@ -166,15 +165,8 @@ export async function decideWhatsNew({
   return entries.length > 0 ? { entries, record: "onClose" } : { entries: [], record: "now" };
 }
 
-/**
- * The CHANGELOG bundled with this build, in the UI language: Chinese for zh
- * and zh-TW (as the i18n fallback does), English otherwise. Each file is its
- * own chunk, fetched only here.
- */
-export async function loadChangelog(language: string): Promise<ChangelogEntry[]> {
-  const raw =
-    language === "zh" || language === "zh-TW"
-      ? (await import("../../CHANGELOG-zh.md?raw")).default
-      : (await import("../../CHANGELOG.md?raw")).default;
+/** The CHANGELOG bundled with this build, fetched as its own chunk. */
+export async function loadChangelog(): Promise<ChangelogEntry[]> {
+  const raw = (await import("../../CHANGELOG.md?raw")).default;
   return parseChangelog(raw);
 }

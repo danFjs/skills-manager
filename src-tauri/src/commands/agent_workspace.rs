@@ -337,6 +337,141 @@ fn import_agent_local_skill_to_center(
     sync_metadata::write_all_from_db_unlocked(store).map_err(AppError::io)
 }
 
+/// What [`adopt_all_agent_skills`] did.
+#[derive(Debug, Default, serde::Serialize)]
+pub struct AdoptSummary {
+    /// Folders imported (or matched to a library skill) and replaced by a link.
+    pub adopted: usize,
+    /// Where the original folders were copied before being replaced.
+    pub backup_dir: Option<String>,
+    pub errors: Vec<String>,
+}
+
+/// Every skill living as a real folder in an installed agent's global skills
+/// directory and not yet deployed from the library: the candidates for
+/// adoption. Links (ours or the user's) and managed deployments are left alone.
+fn adoption_candidates(
+    store: &SkillStore,
+    adapters: Vec<tool_adapters::ToolAdapter>,
+) -> Result<Vec<(tool_adapters::ToolAdapter, project_scanner::ProjectSkillInfo)>, AppError> {
+    let all_targets = store.get_all_targets().map_err(AppError::db)?;
+    let mut out = Vec::new();
+    for adapter in adapters {
+        if !adapter.skills_dir().is_dir() {
+            continue;
+        }
+        for skill in read_agent_local_skills(&adapter) {
+            let path = Path::new(&skill.path);
+            let is_real_dir = std::fs::symlink_metadata(path)
+                .map(|m| m.file_type().is_dir())
+                .unwrap_or(false);
+            if !is_real_dir {
+                continue;
+            }
+            let canonical = std::fs::canonicalize(path).ok();
+            let deployed = all_targets
+                .iter()
+                .any(|t| target_matches_skill_path(t, &skill.path, canonical.as_ref()));
+            if !deployed {
+                out.push((adapter.clone(), skill));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Copy a skill folder aside (files only; links and `.git` skipped) before
+/// adoption replaces it, so the switch to a link is always reversible.
+fn backup_skill_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+    for entry in walkdir::WalkDir::new(src)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| e.file_name() != ".git")
+    {
+        let entry = entry.map_err(std::io::Error::other)?;
+        let rel = entry.path().strip_prefix(src).map_err(std::io::Error::other)?;
+        let target = dst.join(rel);
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&target)?;
+        } else if entry.file_type().is_file() {
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
+}
+
+/// Discover every unmanaged skill in every installed agent's skills folder,
+/// import it into the library and replace the original folder with a link
+/// to the library copy — the per-skill "import to library" action, for all
+/// of them. A skill that several agents hold as identical copies ends up as
+/// one library skill linked from each.
+///
+/// Each original is first copied to `<library>/adopt-backups/<timestamp>/`.
+/// A skill that fails is reported and left exactly as it was.
+pub fn adopt_all_agent_skills(store: &SkillStore) -> Result<AdoptSummary, AppError> {
+    adopt_skills_in(store, tool_adapters::all_tool_adapters(store))
+}
+
+/// [`adopt_all_agent_skills`] over an explicit set of agents (tests pass
+/// only agents pointed at temp folders, never the developer's real ones).
+fn adopt_skills_in(
+    store: &SkillStore,
+    adapters: Vec<tool_adapters::ToolAdapter>,
+) -> Result<AdoptSummary, AppError> {
+    let candidates = adoption_candidates(store, adapters)?;
+    let mut summary = AdoptSummary::default();
+    if candidates.is_empty() {
+        return Ok(summary);
+    }
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let backup_root = crate::core::central_repo::base_dir()
+        .join("adopt-backups")
+        .join(stamp);
+    for (adapter, skill) in candidates {
+        let backup = backup_root.join(&adapter.key).join(&skill.relative_path);
+        // Agents can share one skills folder: once an earlier agent's pass
+        // turned this folder into a link, only the deployment record for
+        // this agent is missing — nothing of the user's is replaced again.
+        let still_real = std::fs::symlink_metadata(&skill.path)
+            .map(|m| m.file_type().is_dir())
+            .unwrap_or(false);
+        if still_real {
+            if let Err(e) = backup_skill_dir(Path::new(&skill.path), &backup) {
+                summary.errors.push(format!(
+                    "{} ({}): backup failed, left untouched: {e}",
+                    skill.name, adapter.display_name
+                ));
+                continue;
+            }
+        }
+        match import_agent_local_skill_to_center(store, &adapter.key, &skill.relative_path) {
+            Ok(()) => summary.adopted += 1,
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&backup);
+                summary
+                    .errors
+                    .push(format!("{} ({}): {e}", skill.name, adapter.display_name));
+            }
+        }
+    }
+    if summary.adopted > 0 {
+        summary.backup_dir = Some(backup_root.to_string_lossy().to_string());
+    } else {
+        let _ = std::fs::remove_dir_all(&backup_root);
+    }
+    Ok(summary)
+}
+
+/// Run [`adopt_all_agent_skills`] now (Settings button, and the startup pass).
+#[tauri::command]
+pub async fn adopt_agent_skills(store: State<'_, Arc<SkillStore>>) -> Result<AdoptSummary, AppError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || adopt_all_agent_skills(&store)).await?
+}
+
 /// Repair "stranded" center skills left behind by uploads that predate the
 /// sync-target registration fix. Such a skill has a center record whose
 /// `source_ref` still points at a skill living in an agent's skills directory,
@@ -692,7 +827,7 @@ fn delete_agent_local_skill(
 #[cfg(test)]
 mod tests {
     use super::{
-        backfill_stranded_agent_targets, enrich_center_status,
+        adopt_skills_in, backfill_stranded_agent_targets, enrich_center_status,
         import_agent_local_skill_to_center, update_agent_local_skill_from_center,
     };
     use crate::core::content_hash;
@@ -703,6 +838,118 @@ mod tests {
         tool_service,
     };
     use std::collections::HashMap;
+
+    /// Only the agents the test pointed at temp folders.
+    fn temp_adapters(store: &SkillStore, keys: &[&str]) -> Vec<tool_adapters::ToolAdapter> {
+        tool_adapters::all_tool_adapters(store)
+            .into_iter()
+            .filter(|a| keys.contains(&a.key.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn adopting_replaces_real_folders_with_library_links_and_backs_them_up() {
+        let _guard = central_repo::test_base_dir_lock();
+        let temp = tempfile::tempdir().unwrap();
+        let center = temp.path().join("center");
+        central_repo::set_test_base_dir_override(Some(center.clone()));
+        let store = SkillStore::new(&temp.path().join("store.db")).unwrap();
+
+        // two agents holding an identical copy of one skill, plus one
+        // skill that is already a link and must be left alone
+        let hermes = temp.path().join("hermes-skills");
+        let cursor = temp.path().join("cursor-skills");
+        for root in [&hermes, &cursor] {
+            std::fs::create_dir_all(root.join("pdf")).unwrap();
+            std::fs::write(root.join("pdf/SKILL.md"), "---\nname: pdf\n---\nRead PDFs\n").unwrap();
+        }
+        let elsewhere = temp.path().join("elsewhere/linked");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::fs::write(elsewhere.join("SKILL.md"), "---\nname: linked\n---\n").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&elsewhere, hermes.join("linked")).unwrap();
+        store
+            .set_setting(
+                "custom_tool_paths",
+                &serde_json::json!({
+                    "hermes": hermes.to_string_lossy(),
+                    "cursor": cursor.to_string_lossy(),
+                })
+                .to_string(),
+            )
+            .unwrap();
+
+        let summary =
+            adopt_skills_in(&store, temp_adapters(&store, &["hermes", "cursor"])).unwrap();
+        assert!(summary.errors.is_empty(), "{:?}", summary.errors);
+        assert_eq!(summary.adopted, 2);
+
+        // one library skill, deployed to both agents
+        let skills = store.get_all_skills().unwrap();
+        assert_eq!(skills.len(), 1, "identical copies become one library skill");
+        let targets = store.get_all_targets().unwrap();
+        assert_eq!(targets.len(), 2);
+        for root in [&hermes, &cursor] {
+            let link = root.join("pdf");
+            #[cfg(unix)]
+            assert!(
+                std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink(),
+                "{link:?} should now be a link"
+            );
+            assert!(std::fs::read_to_string(link.join("SKILL.md")).unwrap().contains("Read PDFs"));
+        }
+
+        // originals were backed up first
+        let backup = std::path::PathBuf::from(summary.backup_dir.unwrap());
+        assert!(backup.join("hermes/pdf/SKILL.md").is_file());
+        assert!(backup.join("cursor/pdf/SKILL.md").is_file());
+
+        // the user's own link was not touched
+        #[cfg(unix)]
+        assert_eq!(std::fs::read_link(hermes.join("linked")).unwrap(), elsewhere);
+
+        // a second pass finds nothing left to do
+        let again =
+            adopt_skills_in(&store, temp_adapters(&store, &["hermes", "cursor"])).unwrap();
+        assert_eq!(again.adopted, 0);
+        assert!(again.backup_dir.is_none());
+
+        central_repo::set_test_base_dir_override(None);
+    }
+
+    #[test]
+    fn adopting_keeps_same_named_different_skills_apart() {
+        let _guard = central_repo::test_base_dir_lock();
+        let temp = tempfile::tempdir().unwrap();
+        central_repo::set_test_base_dir_override(Some(temp.path().join("center")));
+        let store = SkillStore::new(&temp.path().join("store.db")).unwrap();
+        let hermes = temp.path().join("hermes-skills");
+        let cursor = temp.path().join("cursor-skills");
+        for (root, body) in [(&hermes, "first"), (&cursor, "second")] {
+            std::fs::create_dir_all(root.join("notes")).unwrap();
+            std::fs::write(root.join("notes/SKILL.md"), format!("---\nname: notes\n---\n{body}\n"))
+                .unwrap();
+        }
+        store
+            .set_setting(
+                "custom_tool_paths",
+                &serde_json::json!({
+                    "hermes": hermes.to_string_lossy(),
+                    "cursor": cursor.to_string_lossy(),
+                })
+                .to_string(),
+            )
+            .unwrap();
+
+        let summary =
+            adopt_skills_in(&store, temp_adapters(&store, &["hermes", "cursor"])).unwrap();
+        assert!(summary.errors.is_empty(), "{:?}", summary.errors);
+        assert_eq!(store.get_all_skills().unwrap().len(), 2, "no overwrite");
+        assert!(std::fs::read_to_string(hermes.join("notes/SKILL.md")).unwrap().contains("first"));
+        assert!(std::fs::read_to_string(cursor.join("notes/SKILL.md")).unwrap().contains("second"));
+
+        central_repo::set_test_base_dir_override(None);
+    }
 
     #[test]
     fn importing_nested_hermes_skill_preserves_same_named_category() {

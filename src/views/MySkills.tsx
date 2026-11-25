@@ -10,9 +10,6 @@ import {
   Layers,
   RefreshCw,
   RotateCcw,
-  GitBranch,
-  ArrowUpCircle,
-  Wrench,
   Loader2,
   SquareCheck,
   Square,
@@ -27,7 +24,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
-import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { cn } from "../utils";
@@ -49,7 +45,6 @@ import { getTagColor, pruneStaleTagFilters, UNTAGGED_FILTER } from "../lib/skill
 import type {
   ManagedSkill,
   ToolInfo,
-  GitBackupStatus,
   SkillToolToggle,
 } from "../lib/tauri";
 import { getErrorMessage } from "../lib/error";
@@ -149,7 +144,6 @@ function centralDirName(skill: ManagedSkill) {
 
 export function MySkills() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const {
     viewedPreset,
     activePreset,
@@ -198,8 +192,6 @@ export function MySkills() {
   const [toolToggles, setToolToggles] = useState<SkillToolToggle[] | null>(null);
   const [togglingToolKey, setTogglingToolKey] = useState<string | null>(null);
   const [togglingTarget, setTogglingTarget] = useState<{ skillId: string; tool: string } | null>(null);
-  const [gitStatus, setGitStatus] = useState<GitBackupStatus | null>(null);
-  const [gitRemoteConfig, setGitRemoteConfig] = useState("");
   const [tagEditSkillId, setTagEditSkillId] = useState<string | null>(null);
   const [menuSkillId, setMenuSkillId] = useState<string | null>(null);
   const [skillToDelete, setSkillToDelete] = useState<ManagedSkill | null>(null);
@@ -217,15 +209,6 @@ export function MySkills() {
     }
     api.getPresetSkillOrder(viewedPreset.id).then(setPresetSkillOrder).catch(() => {});
   }, [viewedPreset, skills]);
-
-  // Skills with an unresolved sync conflict get a "needs attention" badge
-  // that jumps to the Backup page (merge-engine design §4 UI).
-  const [conflictIds, setConflictIds] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    api.gitBackupPendingConflicts()
-      .then((rows) => setConflictIds(new Set(rows.map((row) => row.skill_id))))
-      .catch(() => setConflictIds(new Set()));
-  }, [skills]);
 
   const refreshAllTags = async () => {
     try {
@@ -492,64 +475,6 @@ export function MySkills() {
   // Grouped order is source order, not the preset's order, so dragging would
   // move a skill to a position the user cannot see.
   const canDrag = !!viewedPreset && !groupBySource;
-
-  const refreshGitStatus = useCallback(async () => {
-    try {
-      await api.gitBackupFetch().catch(() => {});
-      const status = await api.gitBackupStatus();
-      setGitStatus(status);
-    } catch {
-      // not critical
-    }
-  }, []);
-
-  // Local-only status refresh: no `git fetch`, so it can fire from
-  // dependency-driven effects without driving the file-watcher → refresh
-  // → fetch feedback loop.
-  const refreshGitStatusLocal = useCallback(async () => {
-    try {
-      const status = await api.gitBackupStatus();
-      setGitStatus(status);
-    } catch {
-      // not critical
-    }
-  }, []);
-
-  useEffect(() => {
-    (async () => {
-      const savedRemote = (await api.getSettings("git_backup_remote_url").catch(() => null))?.trim() || "";
-      const status = await api.gitBackupStatus().catch(() => null);
-      setGitStatus(status);
-      // The saved setting is the single source of truth. Do not backfill from
-      // `.git/config` — that made a cleared URL reappear after disconnect (#260).
-      setGitRemoteConfig(savedRemote);
-    })();
-  }, []);
-
-  useEffect(() => {
-    const handleWindowFocus = () => {
-      refreshGitStatus();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshGitStatus();
-      }
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("focus", handleWindowFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshGitStatus]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      refreshGitStatusLocal();
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [skills, refreshGitStatusLocal]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1059,76 +984,6 @@ export function MySkills() {
     }
   };
 
-  type GitToolbarMode =
-    | "loading"
-    | "uninitialized"
-    | "needs_remote"
-    | "needs_fix"
-    | "up_to_date"
-    | "pending_changes";
-
-  const getGitToolbarMode = (): GitToolbarMode => {
-    if (!gitStatus) return "loading";
-    if (!gitStatus.is_repo) return "uninitialized";
-    if (!gitStatus.remote_url && !gitRemoteConfig) return "needs_remote";
-    if (
-      gitStatus.upstream_health === "unrelated_histories"
-      || gitStatus.upstream_health === "detached"
-    ) {
-      return "needs_fix";
-    }
-    // First-push case: remote is set but upstream tracking is not yet established.
-    // Treat as a normal pending sync — the push path will set upstream automatically.
-    if (gitStatus.upstream_health === "no_upstream") {
-      return "pending_changes";
-    }
-    if (gitStatus.has_changes || gitStatus.ahead > 0 || gitStatus.behind > 0) {
-      return "pending_changes";
-    }
-    return "up_to_date";
-  };
-
-  const getGitStatusMeta = (mode: GitToolbarMode) => {
-    if (mode === "loading") {
-      return {
-        icon: Loader2,
-        label: t("backup.status.loading"),
-        className: "text-muted",
-        iconClassName: "animate-spin",
-      };
-    }
-    if (mode === "uninitialized" || mode === "needs_remote") {
-      return {
-        icon: GitBranch,
-        label: t("backup.status.notConnected"),
-        className: "text-muted",
-        iconClassName: "",
-      };
-    }
-    if (mode === "needs_fix") {
-      return {
-        icon: Wrench,
-        label: t("backup.status.needsFix"),
-        className: "text-red-500",
-        iconClassName: "",
-      };
-    }
-    if (mode === "pending_changes") {
-      return {
-        icon: ArrowUpCircle,
-        label: t("backup.status.pending"),
-        className: "text-amber-600 dark:text-amber-400",
-        iconClassName: "",
-      };
-    }
-    return {
-      icon: CheckCircle2,
-      label: t("backup.status.synced"),
-      className: "text-muted",
-      iconClassName: "",
-    };
-  };
-
   const sourceIcon = (type: string) => {
     switch (type) {
       case "git":
@@ -1278,29 +1133,10 @@ export function MySkills() {
         {/* Keep all library actions in one toolbar so they wrap together. */}
         <div className="flex items-center gap-3">
           <div className="app-segmented app-toolbar-segmented shrink-0">
-            {(() => {
-              const mode = getGitToolbarMode();
-              const meta = getGitStatusMeta(mode);
-              const Icon = meta.icon;
-              return (
-                <button
-                  type="button"
-                  onClick={() => navigate("/backup")}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium transition-colors hover:bg-surface-hover hover:text-secondary",
-                    meta.className
-                  )}
-                  title={t("sidebar.backup")}
-                >
-                  <Icon className={cn("h-3.5 w-3.5", meta.iconClassName)} />
-                  {meta.label}
-                </button>
-              );
-            })()}
             <button
               onClick={handleCheckAllUpdates}
               disabled={checkingAll}
-              className="ml-2 mr-2 inline-flex items-center gap-1 rounded-md border-l border-border-subtle pl-4 pr-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
+              className="mr-2 inline-flex items-center gap-1 rounded-md px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-hover hover:text-secondary disabled:opacity-50"
             >
               <RefreshCw className={cn("h-3.5 w-3.5", checkingAll && "animate-spin")} />
               {t("mySkills.updateActions.checkAll")}
@@ -1646,17 +1482,8 @@ export function MySkills() {
                     <p className="text-[13px] leading-[18px] text-muted truncate">
                       {skill.description || "—"}
                     </p>
-                    {((badge && !showUpdatePill) || conflictIds.has(skill.id)) && (
+                    {badge && !showUpdatePill && (
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {conflictIds.has(skill.id) && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate("/backup"); }}
-                            className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[13px] font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
-                            title={t("mySkills.needsAttentionHint")}
-                          >
-                            {t("mySkills.needsAttention")}
-                          </button>
-                        )}
                         {badge && !showUpdatePill && (
                           <span
                             className={cn(
@@ -1809,15 +1636,6 @@ export function MySkills() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2.5">
-                  {conflictIds.has(skill.id) && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate("/backup"); }}
-                      className="rounded-full bg-amber-500/12 px-2 py-0.5 text-[12px] font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
-                      title={t("mySkills.needsAttentionHint")}
-                    >
-                      {t("mySkills.needsAttention")}
-                    </button>
-                  )}
                   {hasUpdate && !isMultiSelect ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRefreshSkill(skill); }}

@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import type { AppUpdateInfo, ManagedSkill, Project, Preset, ToolInfo } from "../lib/tauri";
+import type { AdoptSummary, ManagedSkill, Project, Preset, ToolInfo } from "../lib/tauri";
 import * as api from "../lib/tauri";
 import i18n from "../i18n";
 import { applyTextSize } from "../lib/textScale";
@@ -22,8 +22,6 @@ interface AppState {
   detailSkillId: string | null;
   /** Result of the last app-version check. Notification only: installing an
    *  update is always started by the user from Settings. */
-  appUpdate: AppUpdateInfo | null;
-  refreshAppUpdate: () => Promise<AppUpdateInfo>;
   refreshAppData: () => Promise<void>;
   refreshPresets: () => Promise<void>;
   refreshTools: () => Promise<void>;
@@ -45,7 +43,6 @@ const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const SKILL_UPDATE_TOAST_ID = "skill-update-available";
-  const APP_UPDATE_TOAST_ID = "app-update-available";
   const [presets, setPresets] = useState<Preset[]>([]);
   const [activePreset, setActivePreset] = useState<Preset | null>(null);
   const [viewedPresetId, setViewedPresetIdState] = useState<string | null>(() => {
@@ -62,9 +59,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appError, setAppError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
-  const [appUpdate, setAppUpdate] = useState<AppUpdateInfo | null>(null);
   const autoCheckInFlightRef = useRef(false);
-  const appUpdateCheckedRef = useRef(false);
   const lastUpdateNotificationRef = useRef<string | null>(null);
   const lastActivePresetIdRef = useRef<string | null>(null);
 
@@ -285,61 +280,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const refreshAppUpdate = useCallback(async () => {
-    const info = await api.checkAppUpdate();
-    setAppUpdate(info);
-    return info;
-  }, []);
-
-  // Check for a newer app version on startup. This only ever *notifies* — the
-  // download and install stay behind the button in Settings, so the user
-  // decides whether to take an update. Deliberately unlike the skill
-  // auto-update above, which has an opt-in "apply automatically" setting.
-  //
-  // Failures are logged, never toasted: this runs unprompted on every launch,
-  // and users who cannot reach GitHub would otherwise get an error every time
-  // they open the app.
-  //
-  // The ref makes it once per process, not once per `loading` edge:
-  // `refreshAppData` flips `loading` on every call, and a file-change event or
-  // a manual reload would otherwise re-hit the GitHub API and re-raise the
-  // toast. An in-flight guard would not be enough — it only blocks overlap.
-  //
-  // Set inside the timer, not before it: `loading` flipping back to true within
-  // the delay (the file watcher emits a change event as it builds its initial
-  // watch set) tears this effect down and clears the pending timer, and marking
-  // it done up front would skip the check for the rest of the session.
+  // Startup adoption (fork): skills found as plain folders in agent
+  // directories were imported and replaced by links. Refresh the library
+  // and say so once; per-skill failures go to the log, not a toast pile.
   useEffect(() => {
-    if (loading || appUpdateCheckedRef.current) return;
-    const timer = setTimeout(() => {
-      appUpdateCheckedRef.current = true;
-      refreshAppUpdate()
-        .then((info) => {
-          if (!info.has_update) return;
-          toast.info(
-            i18n.t("settings.updateAvailable", { version: info.latest_version }),
-            {
-              id: APP_UPDATE_TOAST_ID,
-              duration: 8000,
-              action: {
-                label: i18n.t("settings.viewUpdate"),
-                onClick: () => {
-                  if (!window.location.pathname.endsWith("/settings")) {
-                    window.history.pushState(null, "", "/settings");
-                    window.dispatchEvent(new PopStateEvent("popstate"));
-                  }
-                },
-              },
-            }
-          );
-        })
-        .catch((err) => {
-          console.error("Startup app update check failed:", err);
-        });
-    }, 3000);
-    return () => clearTimeout(timer);
+    const unlistenPromise = listen<AdoptSummary>("skills-adopted", (event) => {
+      const { adopted, errors } = event.payload;
+      if (errors.length > 0) console.warn("Skill adoption issues:", errors);
+      if (adopted > 0) {
+        toast.success(i18n.t("share.adopted", { count: adopted }));
+        refreshManagedSkills();
+      } else if (errors.length > 0) {
+        toast.error(i18n.t("share.adoptFailed", { count: errors.length }));
+      }
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten()).catch(() => {});
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, []);
 
   // Check skill updates on startup (non-blocking, silent). When the user has
   // opted in via the Settings toggle, also apply any available updates.
@@ -449,8 +408,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         appError,
         helpOpen,
         detailSkillId,
-        appUpdate,
-        refreshAppUpdate,
         refreshAppData,
         refreshPresets,
         refreshTools,

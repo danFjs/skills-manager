@@ -4,7 +4,6 @@ import {
   FolderOpen,
   RefreshCw,
   Link as LinkIcon,
-  Unlink,
   Copy,
   Settings2,
   Github,
@@ -17,7 +16,6 @@ import {
   AlertTriangle,
   BookOpen,
   Bug,
-  Download,
   FileArchive,
   Type,
   Pencil,
@@ -52,9 +50,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import { writeText as clipboardWriteText } from "@tauri-apps/plugin-clipboard-manager";
-import { check as checkUpdater } from "@tauri-apps/plugin-updater";
 import { open as dialogOpen, confirm as dialogConfirm } from "@tauri-apps/plugin-dialog";
-import { useNavigate } from "react-router-dom";
 import { cn, compactHomePath } from "../utils";
 import { useApp } from "../context/AppContext";
 import { useThemeContext } from "../context/ThemeContext";
@@ -66,17 +62,7 @@ import { loadChangelog, selectWhatsNew, type ChangelogEntry } from "../lib/chang
 import * as api from "../lib/tauri";
 import { applyTextSize } from "../lib/textScale";
 import { getErrorMessage } from "../lib/error";
-import { IS_MACOS, IS_WINDOWS } from "../lib/platform";
 import type { Theme } from "../hooks/useTheme";
-
-/** Platforms whose updater artifact can replace the running install.
- *
- *  Linux is excluded on purpose: only the AppImage can be updated in place,
- *  and a .deb/.rpm install is indistinguishable from it here, so those users
- *  keep the download link rather than a button that fails for half of them. */
-const CAN_INSTALL_IN_APP = IS_WINDOWS || IS_MACOS;
-
-const RESTART_TOAST_ID = "app-update-restart";
 
 interface SortableAgentCardProps {
   agentKey: string;
@@ -153,8 +139,7 @@ function AgentGroupDnd({ items, sensors, dragLabel, onDragEnd, renderAgentCard }
 
 export function Settings() {
   const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const { tools, refreshTools, refreshManagedSkills, openHelp, appUpdate, refreshAppUpdate } = useApp();
+  const { tools, refreshTools, refreshManagedSkills, openHelp } = useApp();
   const [togglingTools, setTogglingTools] = useState<Set<string>>(new Set());
   const { theme, setTheme } = useThemeContext();
   const [syncMode, setSyncMode] = useState("symlink");
@@ -174,18 +159,13 @@ export function Settings() {
   const [editingCentralRepoPath, setEditingCentralRepoPath] = useState(false);
   const [centralRepoPathInput, setCentralRepoPathInput] = useState("");
   const [savingCentralRepoPath, setSavingCentralRepoPath] = useState(false);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [installing, setInstalling] = useState(false);
   const [appVersion, setAppVersion] = useState("");
   // This version's "What's new"; empty hides the entry point.
   const [currentRelease, setCurrentRelease] = useState<ChangelogEntry[]>([]);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  const [gitRemoteInput, setGitRemoteInput] = useState("");
-  const [gitRemoteSaving, setGitRemoteSaving] = useState(false);
-  const [gitRemoteDisconnecting, setGitRemoteDisconnecting] = useState(false);
-  const [gitEngineGit2, setGitEngineGit2] = useState(false);
-  // Object merge is the default since 3d-β; "system" is the opt-out.
-  const [gitMergeEngineObject, setGitMergeEngineObject] = useState(true);
+  // Fork: adopt plain-folder agent skills into the library on launch.
+  const [autoAdopt, setAutoAdopt] = useState(true);
+  const [adopting, setAdopting] = useState(false);
   const [proxyInput, setProxyInput] = useState("");
   const [proxySaving, setProxySaving] = useState(false);
   const [textSize, setTextSize] = useState("default");
@@ -357,7 +337,7 @@ export function Settings() {
   useEffect(() => {
     if (!appVersion) return;
     let cancelled = false;
-    loadChangelog(i18n.language)
+    loadChangelog()
       .then((entries) => {
         if (!cancelled) setCurrentRelease(selectWhatsNew(entries, appVersion, null));
       })
@@ -392,18 +372,10 @@ export function Settings() {
     }).catch(() => {});
     api.getCentralRepoPathOverride().then(setCentralRepoPathOverride).catch(() => {});
     api.getCentralRepoPendingPath().then(setCentralRepoPendingPath).catch(() => {});
+    api.getSettings("auto_adopt_skills").then((v) => {
+      setAutoAdopt((v ?? "").trim() !== "false");
+    }).catch(() => {});
 
-    // The saved setting is the single source of truth. Do not backfill from
-    // `.git/config` — that made a cleared URL reappear on reopen (#260).
-    api.getSettings("git_backup_remote_url").then((v) => {
-      setGitRemoteInput(v?.trim() || "");
-    }).catch(() => {});
-    api.getSettings("git_backup_engine").then((v) => {
-      setGitEngineGit2(v?.trim() === "git2");
-    }).catch(() => {});
-    api.getSettings("merge_engine").then((v) => {
-      setGitMergeEngineObject((v ?? "").trim() !== "system");
-    }).catch(() => {});
   }, []);
 
   const handleRefresh = async () => {
@@ -468,12 +440,6 @@ export function Settings() {
       setCloseAction("close");
       await api.setSettings("close_action", "close");
     }
-  };
-
-  const handleLanguageChange = (lng: string) => {
-    localStorage.setItem("language", lng);
-    i18n.changeLanguage(lng);
-    api.setSettings("language", lng);
   };
 
   const handleTextSizeChange = (size: string) => {
@@ -716,98 +682,24 @@ export function Settings() {
     }
   };
 
-  const handleCheckUpdate = async () => {
-    setCheckingUpdate(true);
+  const handleAdoptNow = async () => {
+    setAdopting(true);
     try {
-      const info = await refreshAppUpdate();
-      if (info.has_update) {
-        toast.info(t("settings.updateAvailable", { version: info.latest_version }));
-      } else {
-        toast.success(t("settings.noUpdate"));
+      const summary = await api.adoptAgentSkills();
+      if (summary.adopted > 0) {
+        toast.success(t("share.adopted", { count: summary.adopted }));
+        await refreshManagedSkills();
+      } else if (summary.errors.length === 0) {
+        toast.success(t("share.nothingToAdopt"));
       }
-    } catch {
-      toast.error(t("settings.updateError"));
-    } finally {
-      setCheckingUpdate(false);
-    }
-  };
-
-  const handleAutoUpdate = async () => {
-    setInstalling(true);
-    try {
-      // Read-only image or Gatekeeper-translocated copy: the updater would
-      // download the whole bundle and only then fail to swap it, so stop first
-      // and say what to do instead.
-      const blocker = await api.updateInstallBlocker();
-      if (blocker) {
-        toast.error(t("settings.updateRelocate"));
-        return;
+      if (summary.errors.length > 0) {
+        console.warn("Skill adoption issues:", summary.errors);
+        toast.error(t("share.adoptFailed", { count: summary.errors.length }));
       }
-      // The updater plugin does not inherit the app's proxy setting the way
-      // `check_app_update` does. Without this, a user behind a proxy is told a
-      // new version exists and then cannot install it. The proxy given to
-      // check() is carried through to the download.
-      const proxy = (await api.getSettings("proxy_url")) || undefined;
-      const update = await checkUpdater(proxy ? { proxy } : undefined);
-      if (!update) {
-        toast.success(t("settings.noUpdate"));
-        return;
-      }
-      toast.info(t("settings.installing"));
-      await update.downloadAndInstall();
-      // Installing was the user's choice; restarting is a second one. Offered
-      // as a toast action rather than a modal so a stray keypress cannot end
-      // the session mid-task, and it stays up until acted on.
-      toast.success(t("settings.restartToApply"), {
-        id: RESTART_TOAST_ID,
-        duration: Infinity,
-        action: {
-          label: t("settings.restartNow"),
-          onClick: () => {
-            api.restartApp().catch((err) => {
-              toast.error(getErrorMessage(err, t("common.error")));
-            });
-          },
-        },
-      });
-    } catch (err) {
-      console.error("In-app update failed:", err);
-      toast.error(t("settings.updateError"));
-      if (appUpdate?.release_url) {
-        await openUrl(appUpdate.release_url);
-      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("common.error")));
     } finally {
-      setInstalling(false);
-    }
-  };
-
-  const handleSaveGitRemote = async () => {
-    setGitRemoteSaving(true);
-    try {
-      // Credentials embedded in the URL go to the OS keychain; only the
-      // sanitized URL is persisted (backup redesign §3.7).
-      const trimmed = gitRemoteInput.trim();
-      const effective = trimmed ? await api.gitBackupSanitizeRemoteUrl(trimmed) : "";
-      await api.setSettings("git_backup_remote_url", effective);
-      setGitRemoteInput(effective);
-      toast.success(t("settings.gitConfigSaved"));
-    } catch {
-      toast.error(t("common.error"));
-    } finally {
-      setGitRemoteSaving(false);
-    }
-  };
-
-  const handleDisconnectGitRemote = async () => {
-    setGitRemoteDisconnecting(true);
-    try {
-      await api.gitBackupRemoveRemote();
-      setGitRemoteInput("");
-      toast.success(t("settings.gitDisconnected"));
-    } catch {
-      toast.error(t("common.error"));
-    } finally {
-      setGitRemoteDisconnecting(false);
+      setAdopting(false);
     }
   };
 
@@ -1560,34 +1452,6 @@ export function Settings() {
               </div>
             </div>
 
-            {/* Language */}
-            <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-[14px] font-semibold text-primary">{t("settings.language")}</h3>
-              </div>
-              {/* More languages than a segmented control holds, so a select. */}
-              <div className="relative">
-                <select
-                  value={i18n.language}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                  aria-label={t("settings.language")}
-                  className="app-input h-[34px] cursor-pointer appearance-none bg-background pr-8 dark:[color-scheme:dark]"
-                >
-                  {[
-                    { value: "zh", label: "简体中文" },
-                    { value: "zh-TW", label: "繁體中文" },
-                    { value: "en", label: "English" },
-                    { value: "es", label: "Español" },
-                    { value: "ko", label: "한국어" },
-                  ].map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-              </div>
-            </div>
 
             {/* Close action */}
             <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
@@ -1736,103 +1600,42 @@ export function Settings() {
           </div>
         </section>
 
-        {/* Git sync config */}
+        {/* Library adoption (fork) */}
         <section>
-          <h2 className="app-section-title mb-3">
-            {t("settings.gitSyncConfig")}
-          </h2>
+          <h2 className="app-section-title mb-3">{t("settings.adoptTitle")}</h2>
           <div className="app-panel overflow-hidden divide-y divide-border-faint">
-            <div className="px-4 py-3">
-              <h3 className="text-[14px] font-semibold text-primary">{t("settings.gitRemoteUrl")}</h3>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="mt-0.5 text-[12px] text-muted">{t("settings.gitSyncConfigDesc")}</p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/backup")}
-                  className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  {t("settings.openBackupPage")}
-                </button>
+            <div className="flex items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <div className="text-[14px] font-semibold text-primary">{t("settings.adoptAuto")}</div>
+                <p className="mt-0.5 text-[12px] text-muted">{t("settings.adoptAutoDesc")}</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  value={gitRemoteInput}
-                  onChange={(e) => setGitRemoteInput(e.target.value)}
-                  placeholder={t("settings.gitRemoteUrlPlaceholder")}
-                  className={`${fieldClass} min-w-0 flex-1 font-mono`}
-                />
-                <button
-                  onClick={handleSaveGitRemote}
-                  disabled={gitRemoteSaving}
-                  className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
-                >
-                  {gitRemoteSaving ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <LinkIcon className="w-3 h-3" />
-                  )}
-                  {t("common.save")}
-                </button>
-                <button
-                  onClick={handleDisconnectGitRemote}
-                  disabled={gitRemoteDisconnecting}
-                  className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
-                >
-                  {gitRemoteDisconnecting ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Unlink className="w-3 h-3" />
-                  )}
-                  {t("settings.gitDisconnect")}
-                </button>
-              </div>
-              <p className="text-[12px] text-muted mt-2">{t("settings.gitDisconnectHint")}</p>
-              <div className="mt-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[14px] font-semibold text-primary">{t("settings.gitEngineGit2")}</div>
-                  <p className="mt-0.5 text-[12px] text-muted">{t("settings.gitEngineGit2Desc")}</p>
-                </div>
-                <ToggleSwitch
-                  className="mt-1"
-                  checked={gitEngineGit2}
-                  title={t("settings.gitEngineGit2")}
-                  onChange={async () => {
-                    const next = !gitEngineGit2;
-                    setGitEngineGit2(next);
-                    try {
-                      await api.setSettings("git_backup_engine", next ? "git2" : "system");
-                      toast.success(t("common.success"));
-                    } catch {
-                      setGitEngineGit2(!next);
-                      toast.error(t("common.error"));
-                    }
-                  }}
-                />
-              </div>
-              <div className="mt-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[14px] font-semibold text-primary">{t("settings.gitMergeEngineObject")}</div>
-                  <p className="mt-0.5 text-[12px] text-muted">{t("settings.gitMergeEngineObjectDesc")}</p>
-                </div>
-                <ToggleSwitch
-                  className="mt-1"
-                  checked={gitMergeEngineObject}
-                  title={t("settings.gitMergeEngineObject")}
-                  onChange={async () => {
-                    const next = !gitMergeEngineObject;
-                    setGitMergeEngineObject(next);
-                    try {
-                      await api.setSettings("merge_engine", next ? "object" : "system");
-                      toast.success(t("common.success"));
-                    } catch {
-                      setGitMergeEngineObject(!next);
-                      toast.error(t("common.error"));
-                    }
-                  }}
-                />
-              </div>
+              <ToggleSwitch
+                className="mt-1"
+                checked={autoAdopt}
+                title={t("settings.adoptAuto")}
+                onChange={async () => {
+                  const next = !autoAdopt;
+                  setAutoAdopt(next);
+                  try {
+                    await api.setSettings("auto_adopt_skills", next ? "true" : "false");
+                  } catch {
+                    setAutoAdopt(!next);
+                    toast.error(t("common.error"));
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <p className="min-w-0 text-[12px] text-muted">{t("settings.adoptNowDesc")}</p>
+              <button
+                type="button"
+                onClick={handleAdoptNow}
+                disabled={adopting}
+                className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
+              >
+                {adopting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                {t("settings.adoptNow")}
+              </button>
             </div>
           </div>
         </section>
@@ -1880,63 +1683,10 @@ export function Settings() {
                 </h3>
                 <p className="text-muted text-[13px]">
                   {t("settings.tagline")}
-                  {appUpdate?.has_update && (
-                    <span className="ml-2 text-amber-500 font-medium">
-                      {t("settings.updateAvailable", { version: appUpdate.latest_version })}
-                    </span>
-                  )}
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {appUpdate?.has_update ? (
-                CAN_INSTALL_IN_APP ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleAutoUpdate}
-                      disabled={installing}
-                      className={`${actionButtonClass} bg-accent text-white border-accent hover:opacity-90`}
-                    >
-                      {installing ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Download className="w-3 h-3" />
-                      )}
-                      {installing ? t("settings.installing") : t("settings.installUpdate")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { openUrl(appUpdate.release_url).catch(() => {}); }}
-                      className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
-                    >
-                      <ExternalLink className="w-3 h-3" /> {t("settings.download")}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { openUrl(appUpdate.release_url).catch(() => {}); }}
-                    className={`${actionButtonClass} bg-accent text-white border-accent hover:opacity-90`}
-                  >
-                    <Download className="w-3 h-3" /> {t("settings.download")}
-                  </button>
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCheckUpdate}
-                  disabled={checkingUpdate}
-                  className={`${actionButtonClass} bg-surface-hover hover:bg-surface-active text-tertiary border-border`}
-                >
-                  {checkingUpdate ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                  {checkingUpdate ? t("settings.checking") : t("settings.checkUpdate")}
-                </button>
-              )}
               <button
                 type="button"
                 onClick={openHelp}

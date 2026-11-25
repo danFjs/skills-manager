@@ -1,8 +1,6 @@
 import i18next from "i18next";
 import { describe, expect, it } from "vitest";
 import en from "../i18n/en.json";
-import zh from "../i18n/zh.json";
-import zhTW from "../i18n/zh-TW.json";
 import { countHiddenSelected, hiddenSelectionTexts } from "./selectionVisibility";
 
 const ids = (...values: string[]) => new Set(values);
@@ -55,7 +53,7 @@ describe("hiddenSelectionTexts", () => {
     const i18n = i18next.createInstance();
     await i18n.init({
       lng,
-      resources: { en: { translation: en }, zh: { translation: zh }, "zh-TW": { translation: zhTW } },
+      resources: { en: { translation: en } },
       interpolation: { escapeValue: false },
     });
     return hiddenSelectionTexts(i18n.t.bind(i18n), selected, hidden);
@@ -77,18 +75,6 @@ describe("hiddenSelectionTexts", () => {
       "Delete 2 selected skills permanently, including 2 not shown in the list? This removes their central library files, preset links, and synced agent targets."
     );
 
-    const zh = await textsIn("zh", 5, 3);
-    expect(zh.toolbarNote).toBe("（其中 3 个未显示）");
-    expect(zh.deleteConfirm).toBe(
-      "确定彻底删除选中的 5 个 Skill（其中 3 个未显示）吗？中央仓库文件、Preset 关联和已同步到各 Agent 的目标都会被移除。"
-    );
-
-    const zhTW = await textsIn("zh-TW", 5, 3);
-    expect(zhTW.toolbarNote).toBe("（其中 3 個未顯示）");
-    expect(zhTW.deleteConfirm).toContain("（其中 3 個未顯示）");
-
-    for (const texts of [en, zh, zhTW]) {
-      expect(`${texts.toolbarNote} ${texts.deleteConfirm}`).not.toMatch(/collapsed|折叠|收合|摺疊/);
-    }
+    expect(`${en.toolbarNote} ${en.deleteConfirm}`).not.toMatch(/collapsed/);
   });
 });

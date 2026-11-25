@@ -22,7 +22,6 @@ const tauriConfPath = path.join(root, 'src-tauri', 'tauri.conf.json');
 const cargoTomlPath = path.join(root, 'src-tauri', 'Cargo.toml');
 const cargoLockPath = path.join(root, 'src-tauri', 'Cargo.lock');
 const changelogPath = path.join(root, 'CHANGELOG.md');
-const changelogZhPath = path.join(root, 'CHANGELOG-zh.md');
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -90,15 +89,13 @@ function updateCargoLockVersion(cargoLock, nextVersion) {
   );
 }
 
-function ensureChangelogEntry(changelog, nextVersion, { zh = false } = {}) {
+function ensureChangelogEntry(changelog, nextVersion) {
   const heading = `## [${nextVersion}] - ${dateStr}`;
   if (changelog.includes(heading) || changelog.includes(`## [${nextVersion}] -`)) {
     return changelog;
   }
 
-  const sections = zh
-    ? ['### 发布概览', '- ', '', '### 用户可见更新', '- ', '', '### 开发者与治理更新', '- ']
-    : ['### Release Overview', '- ', '', '### User-facing', '- ', '', '### Developer & Governance', '- '];
+  const sections = ['### Release Overview', '- ', '', '### User-facing', '- ', '', '### Developer & Governance', '- '];
 
   const entry = [heading, '', ...sections, ''].join('\n');
 
@@ -124,7 +121,6 @@ function main() {
   const cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
   const cargoLock = fs.readFileSync(cargoLockPath, 'utf8');
   const changelog = fs.readFileSync(changelogPath, 'utf8');
-  const changelogZh = fs.readFileSync(changelogZhPath, 'utf8');
 
   const currentVersion = pkg.version;
   const nextVersion = bumpVersion(currentVersion, releaseArg);
@@ -142,7 +138,6 @@ function main() {
   const nextCargoToml = updateCargoPackageVersion(cargoToml, nextVersion);
   const nextCargoLock = updateCargoLockVersion(cargoLock, nextVersion);
   const nextChangelog = ensureChangelogEntry(changelog, nextVersion);
-  const nextChangelogZh = ensureChangelogEntry(changelogZh, nextVersion, { zh: true });
 
   if (dryRun) {
     console.log(`[dry-run] ${currentVersion} -> ${nextVersion}`);
@@ -155,14 +150,12 @@ function main() {
   fs.writeFileSync(cargoTomlPath, nextCargoToml);
   fs.writeFileSync(cargoLockPath, nextCargoLock);
   fs.writeFileSync(changelogPath, nextChangelog);
-  fs.writeFileSync(changelogZhPath, nextChangelogZh);
 
   const starOk = refreshStarHistory();
 
   console.log(`Prepared release ${nextVersion}`);
   console.log('Updated:');
   console.log('- CHANGELOG.md');
-  console.log('- CHANGELOG-zh.md');
   console.log('- package.json');
   console.log('- package-lock.json');
   console.log('- src-tauri/tauri.conf.json');
