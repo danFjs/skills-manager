@@ -773,3 +773,42 @@ export interface CategorizeItem {
  *  Vectors are cached by text, so re-showing a list is instant. */
 export const categorizeItems = (items: CategorizeItem[]) =>
   invoke<Record<string, string>>("categorize_items", { items });
+
+// ── Your collections (fork) ──
+
+export interface UserCollectionSkill {
+  path: string;
+  name: string;
+  description: string;
+}
+
+export interface UserCollection {
+  /** `owner/repo` */
+  repo: string;
+  title: string;
+  branch: string;
+  fetched_at: number;
+  skills: UserCollectionSkill[];
+}
+
+export interface ImportCollectionsResult {
+  added: number;
+  skipped: number;
+  errors: string[];
+}
+
+export const listUserCollections = () => invoke<UserCollection[]>("list_user_collections");
+/** Add a GitHub repo (owner/repo or URL) and read its skills. */
+export const addUserCollection = (repo: string, title?: string) =>
+  invoke<UserCollection>("add_user_collection", { repo, title: title ?? null });
+export const refreshUserCollection = (repo: string) =>
+  invoke<UserCollection>("refresh_user_collection", { repo });
+export const renameUserCollection = (repo: string, title: string) =>
+  invoke<void>("rename_user_collection", { repo, title });
+export const removeUserCollection = (repo: string) => invoke<void>("remove_user_collection", { repo });
+/** Save your collections (repos + names) to a file; returns how many. */
+export const exportUserCollections = (destPath: string) =>
+  invoke<number>("export_user_collections", { destPath });
+/** Add the collections in a shared file (or plain repo list) you don't have yet. */
+export const importUserCollections = (path: string) =>
+  invoke<ImportCollectionsResult>("import_user_collections", { path });

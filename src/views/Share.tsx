@@ -21,6 +21,7 @@ export function Share() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [collectionsBusy, setCollectionsBusy] = useState<"export" | "import" | null>(null);
 
   const sorted = useMemo(
     () => [...managedSkills].sort((a, b) => a.name.localeCompare(b.name)),
@@ -89,6 +90,45 @@ export function Share() {
       unlisten();
       setProgress(null);
       setImporting(false);
+    }
+  };
+
+  const exportCollections = async () => {
+    const dest = await dialogSave({
+      defaultPath: "skill-collections.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (!dest) return;
+    setCollectionsBusy("export");
+    try {
+      const count = await api.exportUserCollections(dest);
+      toast.success(t("share.collectionsExported", { count }));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      setCollectionsBusy(null);
+    }
+  };
+
+  const importCollections = async () => {
+    const picked = await dialogOpen({
+      multiple: false,
+      filters: [{ name: "Collections", extensions: ["json", "txt"] }],
+    });
+    if (!picked || Array.isArray(picked)) return;
+    setCollectionsBusy("import");
+    try {
+      const result = await api.importUserCollections(picked);
+      if (result.added > 0) toast.success(t("share.collectionsImported", { count: result.added }));
+      if (result.skipped > 0) toast.info(t("share.collectionsSkipped", { count: result.skipped }));
+      if (result.errors.length > 0) {
+        console.warn("Collection import issues:", result.errors);
+        toast.error(t("share.collectionsFailed", { count: result.errors.length }));
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("common.error")));
+    } finally {
+      setCollectionsBusy(null);
     }
   };
 
@@ -181,6 +221,35 @@ export function Share() {
               ? t("share.importProgress", { current: progress.current, total: progress.total })
               : t("share.importButton")}
           </button>
+        </div>
+      </section>
+
+      <section className="app-panel max-w-2xl p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-[14px] font-semibold text-primary">{t("share.collectionsTitle")}</h2>
+            <p className="mt-0.5 text-[13px] text-muted">{t("share.collectionsDesc")}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={exportCollections}
+              disabled={collectionsBusy !== null}
+              className="app-button-secondary"
+            >
+              {collectionsBusy === "export" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+              {t("share.collectionsExport")}
+            </button>
+            <button
+              type="button"
+              onClick={importCollections}
+              disabled={collectionsBusy !== null}
+              className="app-button-secondary"
+            >
+              {collectionsBusy === "import" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+              {collectionsBusy === "import" ? t("share.collectionsImporting") : t("share.collectionsImport")}
+            </button>
+          </div>
         </div>
       </section>
     </div>

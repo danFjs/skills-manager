@@ -3,6 +3,7 @@ pub mod authoring;
 pub mod browse;
 pub mod projects;
 pub mod scan;
+pub mod user_collections;
 pub mod presets;
 pub mod semantic;
 pub mod settings;

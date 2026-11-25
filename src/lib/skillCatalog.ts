@@ -72,3 +72,16 @@ export function leaderboardDescription(
   const source = skill.source.toLowerCase();
   return index.get(`${source}/${skill.skill_id.toLowerCase()}`) ?? index.get(`${source}/${skill.name.toLowerCase()}`);
 }
+
+/** Your collections' skills as catalog entries, ahead of the shipped ones;
+ *  a skill present in both appears once. */
+export function mergeUserCollections(
+  shipped: CatalogSkill[],
+  mine: { repo: string; branch: string; skills: { path: string; name: string; description: string }[] }[],
+): CatalogSkill[] {
+  const added: CatalogSkill[] = mine.flatMap((c) =>
+    c.skills.map((s) => ({ repo: c.repo, branch: c.branch, path: s.path, name: s.name, description: s.description })),
+  );
+  const seen = new Set(added.map(catalogKey));
+  return [...added, ...shipped.filter((s) => !seen.has(catalogKey(s)))];
+}

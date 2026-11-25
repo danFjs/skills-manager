@@ -465,6 +465,20 @@
       "summary_other": "{{count}} skills",
       "sorting": "categorizing {{done}}/{{total}}…",
       "none": "No skill matches."
+    },
+    "myCollections": {
+      "title": "Your collections",
+      "shipped": "Shipped with the app",
+      "addPlaceholder": "Add a GitHub repo: owner/repo or URL",
+      "add": "Add",
+      "added_one": "Added {{name}} ({{count}} skill)",
+      "added_other": "Added {{name}} ({{count}} skills)",
+      "refreshed_one": "Refreshed {{name}} ({{count}} skill)",
+      "refreshed_other": "Refreshed {{name}} ({{count}} skills)",
+      "rename": "Rename",
+      "save": "Save name",
+      "refresh": "Re-read its skills from GitHub",
+      "remove": "Remove collection"
     }
   },
   "settings": {
@@ -994,7 +1008,20 @@
     "adopted_other": "Moved {{count}} agent skills into your library (now linked)",
     "adoptFailed_one": "{{count}} agent skill couldn't be adopted (see logs)",
     "adoptFailed_other": "{{count}} agent skills couldn't be adopted (see logs)",
-    "nothingToAdopt": "Every agent skill is already in your library"
+    "nothingToAdopt": "Every agent skill is already in your library",
+    "collectionsTitle": "Collections",
+    "collectionsDesc": "Share the GitHub repos you added as collections — names only; whoever imports them fetches the skills. Plain lists of owner/repo lines import too.",
+    "collectionsExport": "Export",
+    "collectionsImport": "Import",
+    "collectionsImporting": "Importing…",
+    "collectionsExported_one": "Exported {{count}} collection",
+    "collectionsExported_other": "Exported {{count}} collections",
+    "collectionsImported_one": "Added {{count}} collection",
+    "collectionsImported_other": "Added {{count}} collections",
+    "collectionsSkipped_one": "{{count}} collection was already yours",
+    "collectionsSkipped_other": "{{count}} collections were already yours",
+    "collectionsFailed_one": "{{count}} collection couldn't be added (see logs)",
+    "collectionsFailed_other": "{{count}} collections couldn't be added (see logs)"
   },
   "categories": {
     "title": "Categories",

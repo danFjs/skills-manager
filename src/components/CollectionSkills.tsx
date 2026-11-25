@@ -10,9 +10,10 @@ import {
   catalogKey,
   loadSkillCatalog,
   matchesCatalogQuery,
+  mergeUserCollections,
   type CatalogSkill,
 } from "../lib/skillCatalog";
-import type { CategoryInfo, CategoryProgress } from "../lib/tauri";
+import type { CategoryInfo, CategoryProgress, UserCollection } from "../lib/tauri";
 
 const PAGE_SIZE = 24;
 
@@ -22,6 +23,8 @@ interface Props {
   onEditCategories: () => void;
   /** Lowercased names of skills already in the library. */
   installedNames: Set<string>;
+  /** Your own collections; their skills are listed first. */
+  userCollections: UserCollection[];
   /** Opens the git install preview for one skill. */
   onInstall: (url: string) => void;
   busy: boolean;
@@ -30,17 +33,29 @@ interface Props {
 /** Every skill from the curated collection repos as its own card — with
  *  description, category and one-click install. The repos themselves are
  *  listed (uncategorized) on the Git tab. */
-export function CollectionSkills({ categories, progress, onEditCategories, installedNames, onInstall, busy }: Props) {
+export function CollectionSkills({
+  categories,
+  progress,
+  onEditCategories,
+  installedNames,
+  userCollections,
+  onInstall,
+  busy,
+}: Props) {
   const { t } = useTranslation();
-  const [catalog, setCatalog] = useState<CatalogSkill[] | null>(null);
+  const [shipped, setShipped] = useState<CatalogSkill[] | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    loadSkillCatalog().then(setCatalog).catch(() => setCatalog([]));
+    loadSkillCatalog().then(setShipped).catch(() => setShipped([]));
   }, []);
 
+  const catalog = useMemo(
+    () => (shipped === null ? null : mergeUserCollections(shipped, userCollections)),
+    [shipped, userCollections],
+  );
   const matched = useMemo(
     () => (catalog ?? []).filter((s) => matchesCatalogQuery(s, query)),
     [catalog, query],

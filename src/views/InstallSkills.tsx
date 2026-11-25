@@ -33,6 +33,7 @@ import { SkillEditorDialog } from "../components/SkillEditorDialog";
 import { leaderboardDescription, loadLeaderboardDescriptions } from "../lib/skillCatalog";
 import { useCategories } from "../hooks/useCategories";
 import { useItemCategories } from "../hooks/useItemCategories";
+import { useUserCollections } from "../hooks/useUserCollections";
 import { toast } from "sonner";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
@@ -69,6 +70,7 @@ export function InstallSkills() {
   const [marketCategory, setMarketCategory] = useState<string | null>(null);
   const [gitCategory, setGitCategory] = useState<string | null>(null);
   const [creatingSkill, setCreatingSkill] = useState(false);
+  const myCollections = useUserCollections();
   const [editingNew, setEditingNew] = useState<{ id: string; name: string } | null>(null);
   // Descriptions for marketplace entries (skills.sh lists names only),
   // taken from the bundled collections catalog where the skill appears.
@@ -1582,7 +1584,7 @@ export function InstallSkills() {
               </div>
             </div>
           </div>
-          <SkillRepoCollections onBrowse={(url) => handleGitPreview(url)} disabled={gitLoading} />
+          <SkillRepoCollections onBrowse={(url) => handleGitPreview(url)} disabled={gitLoading} mine={myCollections} />
         </div>
       )}
 
@@ -1592,6 +1594,7 @@ export function InstallSkills() {
           progress={semantic.progress}
           onEditCategories={() => setCategoriesOpen(true)}
           installedNames={installedNames}
+          userCollections={myCollections.collections}
           onInstall={(url) => handleGitPreview(url)}
           busy={gitLoading}
         />

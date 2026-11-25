@@ -9,47 +9,64 @@ This is a fork of [xingkongliang/skills-manager](https://github.com/xingkonglian
 Everything not listed below works as in the original — see its README for
 features, install instructions and documentation.
 
-## Differences from the original
+## What this fork adds
 
-- **Local sharing instead of Git backup and sync.** The Backup page, GitHub
-  sign-in, automatic backup, multi-device sync and conflict handling are
-  removed. A new **Share** page exports any library skills to one `.zip` and
-  imports such a zip (skills you already have are skipped). Only skill files
-  are included — no account, no network.
-- **Automatic adoption of agent skills.** On launch, skills found as plain
-  folders in your agents' skills directories are imported into the library
-  and replaced by links to it. Originals are copied to `adopt-backups/` in
-  the library folder first. Toggle it, or run it on demand, under
-  **Settings → Library**.
-- **Create and edit skills.** A **Create skill** button (My Skills and
-  Install Skills) writes a new `SKILL.md` from a template, can link it to
-  agents right away, and opens it in an editor. Any library skill's
-  `SKILL.md` can be edited from its detail panel; agents holding copies are
-  refreshed on save.
-- **Ranked search on My Skills.** Covers names, descriptions, the full
-  `SKILL.md` text, tags and source; tolerates typos and partial words; takes
-  `tag:` / `source:` filters.
-- **Semantic categories.** Skills are sorted into 13 editable categories
-  (plus "Other") by a small on-device embedding model (all-MiniLM-L6-v2,
-  bundled — nothing leaves the machine). Each category's description is what
-  skills are matched against. Category chips filter My Skills, the
-  Leaderboard, the Collections tab and the Git install preview. Index and
-  vectors are cached in `semantic.db` in the library folder.
-- **Collections tab in Install Skills.** Every skill (about 2,900) from 120
-  curated GitHub repositories, each with its description, category,
-  search and a one-click install. The repositories themselves are listed on
-  the Git tab. Both ship with the app (`src/data/`); refresh them with
-  `scripts/build-skill-catalog.mjs`.
+### Find skills
+
+- **Collections tab** (Install Skills → Collections). Every skill from 120
+  curated GitHub repositories — about 2,900 — as its own card with
+  description, category, search and one-click install. Shipped with the app,
+  browsable offline.
+- **Your own collections** (Install Skills → Git → Skill collections). Paste
+  any GitHub repo (`owner/repo` or URL) and click **Add**: its skills join the
+  Collections tab. Rename, refresh or remove it from the same list. Stored in
+  `collections.json` in the library folder.
 - **Descriptions on the Leaderboard.** skills.sh lists names only; the app
-  ships descriptions for about 90% of the leaderboard skills, read from their
+  ships descriptions for about 90% of leaderboard skills, read from their
   repositories' `SKILL.md`.
-- **New icon**, and bigger skill cards in Install Skills.
-- **No app update checks.** The in-app updater and the startup check against
-  the original's GitHub releases are removed.
-- **English only.** Other UI languages and the Chinese README/CHANGELOG are
-  removed.
-- **CLI:** the `git` subcommand (backup) is removed.
-- **Larger download:** the bundled model adds about 90 MB.
+- **Ranked search on My Skills.** Searches names, descriptions, the full
+  `SKILL.md` text, tags and source; tolerates typos and partial words; takes
+  `tag:` and `source:` filters.
+
+### Organize
+
+- **Semantic categories.** Skills are sorted into 13 editable categories
+  (plus "Other") by a small embedding model that runs on your machine
+  (all-MiniLM-L6-v2, bundled — nothing is sent anywhere). Each category's
+  description is what skills are matched against; edit it to re-sort.
+  Category chips filter My Skills, the Leaderboard, the Collections tab and
+  the Git install preview.
+- **Automatic adoption.** On launch, skills found as plain folders in your
+  agents' skills directories are imported into the library and replaced by
+  links to it, so one copy serves every agent. Originals are backed up to
+  `adopt-backups/` first. Toggle or run it under **Settings → Library**.
+
+### Create
+
+- **Create skill** (My Skills and Install Skills). Writes a new `SKILL.md`
+  from a template, optionally links it to agents, and opens it in the editor.
+- **Edit SKILL.md** from any skill's detail panel (pencil icon). Linked
+  agents see the change at once; agents holding copies are refreshed.
+
+### Share — locally, instead of Git sync
+
+- **Skills:** the **Share** page exports any library skills to one `.zip`
+  and imports such a zip; skills you already have are skipped.
+- **Collections:** export the repos you added as collections, or import
+  someone's list (our JSON file, or a plain list of `owner/repo` lines).
+- No account and no network involved — pass the file on any way you like.
+
+### Removed
+
+- Git backup and multi-device sync (Backup page, GitHub sign-in, automatic
+  backup, conflict handling) and the CLI's `git` subcommand.
+- App update checks: the in-app updater and the startup check against the
+  original's releases.
+- Other UI languages and the Chinese README/CHANGELOG — English only.
+
+No telemetry was found in the original; none is added. The bundled model
+makes the download about 90 MB larger. Search index, vectors and category
+edits live in `semantic.db` in the library folder.
 
 ## Building
 
@@ -57,8 +74,6 @@ features, install instructions and documentation.
 npm install
 npm run tauri build   # fetches the pinned embedding model first (~90 MB)
 ```
-
-No telemetry was found in the original; none is added.
 
 ## License
 

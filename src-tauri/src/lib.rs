@@ -1074,6 +1074,13 @@ pub fn run() {
             commands::semantic::save_category,
             commands::semantic::delete_category,
             commands::semantic::categorize_items,
+            commands::user_collections::list_user_collections,
+            commands::user_collections::add_user_collection,
+            commands::user_collections::refresh_user_collection,
+            commands::user_collections::rename_user_collection,
+            commands::user_collections::remove_user_collection,
+            commands::user_collections::export_user_collections,
+            commands::user_collections::import_user_collections,
             // Sync
             commands::sync::sync_skill_to_tool,
             commands::sync::unsync_skill_from_tool,
