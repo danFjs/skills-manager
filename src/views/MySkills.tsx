@@ -22,6 +22,7 @@ import {
   Share2,
   Tag,
   Trash2,
+  Plus,
 } from "lucide-react";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { useTranslation } from "react-i18next";
@@ -42,6 +43,12 @@ import { CardActionMenu, type CardAction } from "../components/CardActionMenu";
 import { SkillTagEditor } from "../components/SkillTagEditor";
 import * as api from "../lib/tauri";
 import { getTagColor, pruneStaleTagFilters, UNTAGGED_FILTER } from "../lib/skillTags";
+import { useCategories } from "../hooks/useCategories";
+import { useLibrarySearch } from "../hooks/useLibrarySearch";
+import { CategoryPills } from "../components/CategoryPills";
+import { CategoriesDialog } from "../components/CategoriesDialog";
+import { CreateSkillDialog } from "../components/CreateSkillDialog";
+import { SkillEditorDialog } from "../components/SkillEditorDialog";
 import type {
   ManagedSkill,
   ToolInfo,
@@ -172,6 +179,13 @@ export function MySkills() {
   // site, a local install, an import. Distinct from the Source grouping below.
   const [channelFilters, setChannelFilters] = useState<Set<string>>(new Set());
   const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
+  // Fork: semantic category filter and its editor.
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  // Fork: create a skill, then open it in the SKILL.md editor.
+  const [creatingSkill, setCreatingSkill] = useState(false);
+  const [editingNew, setEditingNew] = useState<{ id: string; name: string } | null>(null);
+  const semantic = useCategories();
   const [allTags, setAllTags] = useState<string[]>([]);
   // Tag management from the filter bar (#233): right-click a tag pill to
   // rename (dialog) or delete (confirm). Left-click stays "filter only".
@@ -265,6 +279,9 @@ export function MySkills() {
   // decides which skills match, so a query of `-` or `_` cannot open every
   // Source while filtering nothing.
   const normalizedQuery = normalizeSkillSearch(search);
+  // Ranked backend search (SKILL.md text, typos, `tag:`/`source:`); until it
+  // answers, or if it fails, the substring matcher below keeps working.
+  const ranking = useLibrarySearch(normalizedQuery ? search : "", skills);
 
   // A filter can outlive the control that set it (the tag row hides itself once
   // no tag is left), so the empty state carries the way out. `filterMode` is
@@ -274,12 +291,14 @@ export function MySkills() {
     normalizedQuery !== "" ||
     channelFilters.size > 0 ||
     tagFilters.size > 0 ||
+    categoryFilter !== null ||
     sourceSelection.size > 0 ||
     filterMode !== "all";
   const clearFilters = () => {
     setSearch("");
     setChannelFilters(new Set());
     setTagFilters(new Set());
+    setCategoryFilter(null);
     setSourceSelection(new Set());
     setFilterMode("all");
   };
@@ -303,15 +322,17 @@ export function MySkills() {
     return displayNames;
   }, [skills]);
 
-  const { filtered, sourceOptions, preSelectionSourceGroups } = useMemo(() => {
-    const result = skills.filter((skill) => {
+  const { filtered, sourceOptions, preSelectionSourceGroups, categoryCounts } = useMemo(() => {
+    const base = skills.filter((skill) => {
       const displayName = skillDisplayNames.get(skill.id) || skill.name;
-      const matchesSearch = skillSearchMatches(normalizedQuery, [
-        skill.name,
-        displayName,
-        centralDirName(skill),
-        skill.description,
-      ]);
+      const matchesSearch = ranking
+        ? ranking.has(skill.id)
+        : skillSearchMatches(normalizedQuery, [
+            skill.name,
+            displayName,
+            centralDirName(skill),
+            skill.description,
+          ]);
       if (!matchesSearch) return false;
 
       if (channelFilters.size > 0 && !channelFilters.has(skill.source_type)) return false;
@@ -331,12 +352,29 @@ export function MySkills() {
       return true;
     });
 
+    // Category chips count what the other filters leave; the selected chip
+    // then narrows it.
+    const categoryCounts = new Map<string, number>();
+    for (const skill of base) {
+      const category = semantic.assignments[skill.id];
+      if (category) categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+    }
+    const result = categoryFilter
+      ? base.filter((skill) => semantic.assignments[skill.id] === categoryFilter)
+      : base;
+
+    // A ranked search orders by relevance (still enabled-first in a preset).
+    if (ranking) {
+      result.sort((a, b) => (ranking.get(a.id) ?? 0) - (ranking.get(b.id) ?? 0));
+    }
+
     // Always sort enabled skills first; within enabled group, use custom sort order
     if (viewedPreset) {
       result.sort((a, b) => {
         const aEnabled = a.preset_ids.includes(viewedPreset.id) ? 0 : 1;
         const bEnabled = b.preset_ids.includes(viewedPreset.id) ? 0 : 1;
         if (aEnabled !== bEnabled) return aEnabled - bEnabled;
+        if (ranking) return (ranking.get(a.id) ?? 0) - (ranking.get(b.id) ?? 0);
         // Within same group, use preset sort order
         const aOrder = presetSkillOrder.indexOf(a.id);
         const bOrder = presetSkillOrder.indexOf(b.id);
@@ -355,15 +393,16 @@ export function MySkills() {
     const candidates = sourceCandidates(result);
 
     if (sourceSelection.size === 0) {
-      return { filtered: result, sourceOptions: candidates, preSelectionSourceGroups: groups };
+      return { filtered: result, sourceOptions: candidates, preSelectionSourceGroups: groups, categoryCounts };
     }
 
     return {
       filtered: result.filter((skill) => sourceSelection.has(getSkillSourceInfo(skill).key)),
       sourceOptions: candidates,
       preSelectionSourceGroups: groups,
+      categoryCounts,
     };
-  }, [skills, skillDisplayNames, normalizedQuery, channelFilters, tagFilters, sourceSelection, filterMode, viewedPreset, presetSkillOrder]);
+  }, [skills, skillDisplayNames, normalizedQuery, ranking, channelFilters, tagFilters, categoryFilter, semantic.assignments, sourceSelection, filterMode, viewedPreset, presetSkillOrder]);
 
   // Without a source selection the groups from above already describe
   // `filtered`; only a narrowing selection forces a rebuild. That rebuild must
@@ -1132,6 +1171,14 @@ export function MySkills() {
 
         {/* Keep all library actions in one toolbar so they wrap together. */}
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCreatingSkill(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-accent-border bg-accent-dark px-3 py-2 text-[13px] font-medium text-white transition-colors hover:bg-accent"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("authoring.createButton")}
+          </button>
           <div className="app-segmented app-toolbar-segmented shrink-0">
             <button
               onClick={handleCheckAllUpdates}
@@ -1231,7 +1278,44 @@ export function MySkills() {
             />
           </>
         )}
+        {semantic.categories.length > 0 && (
+          <>
+            <span className="mx-0.5 h-3 w-px bg-border-subtle" />
+            <CategoryPills
+              categories={semantic.categories}
+              counts={categoryCounts}
+              selected={categoryFilter}
+              onSelect={setCategoryFilter}
+              onEdit={() => setCategoriesOpen(true)}
+              progress={semantic.progress}
+              className="gap-1"
+            />
+          </>
+        )}
       </div>
+
+      <CreateSkillDialog
+        open={creatingSkill}
+        onClose={() => setCreatingSkill(false)}
+        onCreated={(skill) => {
+          setCreatingSkill(false);
+          setEditingNew({ id: skill.id, name: skill.name });
+        }}
+      />
+      <SkillEditorDialog
+        skillId={editingNew?.id ?? null}
+        skillName={editingNew?.name}
+        sourceType="local"
+        onClose={() => setEditingNew(null)}
+      />
+
+      <CategoriesDialog
+        open={categoriesOpen}
+        categories={semantic.categories}
+        onClose={() => setCategoriesOpen(false)}
+        onSave={semantic.save}
+        onDelete={semantic.remove}
+      />
 
       {isMultiSelect && (
         <MultiSelectToolbar

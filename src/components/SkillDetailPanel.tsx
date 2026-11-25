@@ -10,6 +10,7 @@ import {
   FileWarning,
   FileX,
   FolderOpen,
+  Pencil,
   Github,
   Globe,
   HardDrive,
@@ -43,6 +44,7 @@ import {
 import { SkillSourceDiffViewer } from "./SkillSourceDiffViewer";
 import { DetailSheet } from "./DetailSheet";
 import { SkillMarkdown } from "./SkillMarkdown";
+import { SkillEditorDialog } from "./SkillEditorDialog";
 import { AgentToggleSection, type AgentToggleItem } from "./AgentToggleSection";
 import { SkillProjectsSection } from "./SkillProjectsSection";
 import { SyncDots } from "./SyncDots";
@@ -137,6 +139,7 @@ function SkillDetailPanelContent({
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [tagEditing, setTagEditing] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [tagValue, setTagValue] = useState("");
   const localRequestIdRef = useRef(0);
   const sourceRequestedRef = useRef<string | null>(null);
@@ -409,6 +412,13 @@ function SkillDetailPanelContent({
           onCheckUpdate={onCheckUpdate}
           onRelinkSource={onRelinkSource}
           onDetachSource={onDetachSource}
+          onEdit={() => setEditorOpen(true)}
+        />
+        <SkillEditorDialog
+          skillId={editorOpen ? skill.id : null}
+          skillName={skill.name}
+          sourceType={skill.source_type}
+          onClose={() => setEditorOpen(false)}
         />
       </section>
     </div>
@@ -533,6 +543,7 @@ function SourceDetails({
   onCheckUpdate,
   onRelinkSource,
   onDetachSource,
+  onEdit,
 }: {
   skill: ManagedSkill;
   locale: string;
@@ -541,6 +552,7 @@ function SourceDetails({
   onCheckUpdate?: () => void;
   onRelinkSource?: () => void;
   onDetachSource?: () => void;
+  onEdit?: () => void;
 }) {
   const { t } = useTranslation();
   const ref = skill.source_ref;
@@ -709,6 +721,17 @@ function SourceDetails({
         >
           <FolderOpen className="h-3.5 w-3.5" />
         </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className={iconButton}
+            title={t("authoring.editButton")}
+            aria-label={t("authoring.editButton")}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,10 @@
 pub mod agent_workspace;
+pub mod authoring;
 pub mod browse;
 pub mod projects;
 pub mod scan;
 pub mod presets;
+pub mod semantic;
 pub mod settings;
 pub mod share;
 pub mod skills;

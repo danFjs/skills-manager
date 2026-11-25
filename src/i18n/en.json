@@ -453,11 +453,19 @@
       }
     },
     "collectionsTitle": "Skill collections",
-    "collectionsDesc": "{{count}} GitHub repos that publish skills. Pick one to see its skills and choose what to install.",
+    "collectionsDesc": "{{count}} GitHub repos that publish skills. Pick one to see its skills and choose what to install — or browse every skill on the Collections tab.",
     "collectionsSearch": "Filter collections…",
     "collectionsSkills_one": "{{count}} skill",
     "collectionsSkills_other": "{{count}} skills",
-    "collectionsNone": "No collection matches that filter."
+    "collectionsNone": "No collection matches that filter.",
+    "collectionsTab": "Collections",
+    "collectionSkills": {
+      "search": "Search {{count}} skills from the collections…",
+      "summary_one": "{{count}} skill",
+      "summary_other": "{{count}} skills",
+      "sorting": "categorizing {{done}}/{{total}}…",
+      "none": "No skill matches."
+    }
   },
   "settings": {
     "title": "Settings",
@@ -987,5 +995,47 @@
     "adoptFailed_one": "{{count}} agent skill couldn't be adopted (see logs)",
     "adoptFailed_other": "{{count}} agent skills couldn't be adopted (see logs)",
     "nothingToAdopt": "Every agent skill is already in your library"
+  },
+  "categories": {
+    "title": "Categories",
+    "hint": "Skills are sorted by meaning: each one goes to the category whose description it is closest to. Concrete tasks, tools and words work best.",
+    "otherHint": "Skills that fit no other category",
+    "edit": "Edit categories",
+    "editOne": "Edit",
+    "delete": "Delete category",
+    "new": "+ New category",
+    "add": "Add category",
+    "save": "Save",
+    "name": "Name",
+    "emoji": "Emoji",
+    "description": "Description",
+    "descriptionPlaceholder": "What belongs here? e.g. “Game development: Unity and Godot, level design, shaders, sprites and game loops.”",
+    "descriptionTooShort_one": "Describe it in at least {{count}} character — skills are matched against this",
+    "descriptionTooShort_other": "Describe it in at least {{count}} characters — skills are matched against this",
+    "resortHint": "Skills are re-sorted after saving",
+    "sorting_one": "sorting {{count}}…",
+    "sorting_other": "sorting {{count}}…",
+    "sortingHint": "Sorting skills into categories in the background",
+    "unavailable": "categories unavailable"
+  },
+  "authoring": {
+    "createButton": "Create skill",
+    "createTitle": "Create a skill",
+    "name": "Name",
+    "nameHint": "The folder name — letters, digits, '-', '_' and '.'.",
+    "description": "Description",
+    "descriptionPlaceholder": "What the skill does, and when an agent should use it",
+    "linkTo": "Link to agents (optional)",
+    "creating": "Creating…",
+    "createAndEdit": "Create and edit",
+    "created": "Created {{name}}",
+    "linkFailed_one": "Couldn't link to {{count}} agent — use the agent badges on the card",
+    "linkFailed_other": "Couldn't link to {{count}} agents — use the agent badges on the card",
+    "editButton": "Edit SKILL.md",
+    "editTitle": "Edit {{name}} — SKILL.md",
+    "updateOverwrites": "This skill comes from a remote source; updating it will replace your edits.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   }
 }

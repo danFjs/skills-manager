@@ -711,3 +711,65 @@ export const updateGlobalLocalSkillFromCenter = (agent: string, skillRelativePat
 
 export const deleteGlobalLocalSkill = (agent: string, skillRelativePath: string) =>
   invoke<void>("delete_global_local_skill", { agent, skillRelativePath });
+
+// ── Search & categories (fork) ──
+
+export interface LibraryHit {
+  id: string;
+  /** Matched SKILL.md text, terms wrapped in \u0002 … \u0003. */
+  snippet: string | null;
+}
+
+/** Ranked search over library skills; supports `tag:` and `source:`. */
+export const searchLibrary = (query: string) => invoke<LibraryHit[]>("search_library", { query });
+
+export interface CategoryInfo {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  builtin: boolean;
+  /** "Other": renamable, never deleted or embedded. */
+  fallback: boolean;
+}
+
+export interface CategoryProgress {
+  remaining: number;
+  unavailable: string | null;
+}
+
+export const listCategories = () => invoke<CategoryInfo[]>("list_categories");
+
+/** Skill id → category id for every skill sorted so far. */
+export const categoryAssignments = () => invoke<Record<string, string>>("category_assignments");
+
+export const saveCategory = (input: { id?: string; name: string; emoji: string; description: string }) =>
+  invoke<CategoryInfo>("save_category", {
+    id: input.id ?? null,
+    name: input.name,
+    emoji: input.emoji,
+    description: input.description,
+  });
+
+export const deleteCategory = (id: string) => invoke<void>("delete_category", { id });
+
+// ── Authoring (fork) ──
+
+/** Create `<library>/<name>/SKILL.md` from the template (a local skill). */
+export const createSkill = (name: string, description: string) =>
+  invoke<ManagedSkill>("create_skill", { name, description });
+
+/** Overwrite a library skill's top-level SKILL.md; copies on agents are refreshed. */
+export const saveSkillDocument = (skillId: string, content: string) =>
+  invoke<ManagedSkill>("save_skill_document", { skillId, content });
+
+export interface CategorizeItem {
+  key: string;
+  /** What the skill is: name, plus description when there is one. */
+  text: string;
+}
+
+/** Sort not-yet-installed skills (marketplace, git preview) into categories.
+ *  Vectors are cached by text, so re-showing a list is instant. */
+export const categorizeItems = (items: CategorizeItem[]) =>
+  invoke<Record<string, string>>("categorize_items", { items });

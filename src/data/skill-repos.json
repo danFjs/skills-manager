@@ -7,7 +7,7 @@
   {
     "repo": "anthropics/knowledge-work-plugins",
     "title": "anthropics/knowledge-work-plugins",
-    "skills": 232
+    "skills": 252
   },
   {
     "repo": "K-Dense-AI/claude-scientific-skills",
@@ -15,9 +15,19 @@
     "skills": 177
   },
   {
+    "repo": "trailofbits/skills",
+    "title": "trailofbits/skills",
+    "skills": 99
+  },
+  {
+    "repo": "Orchestra-Research/AI-research-SKILLs",
+    "title": "Orchestra-Research/AI-research-SKILLs",
+    "skills": 98
+  },
+  {
     "repo": "datadog-labs/agent-skills",
     "title": "datadog-labs/agent-skills",
-    "skills": 82
+    "skills": 88
   },
   {
     "repo": "NeoLabHQ/context-engineering-kit",
@@ -30,9 +40,19 @@
     "skills": 58
   },
   {
+    "repo": "coreyhaines31/marketingskills",
+    "title": "coreyhaines31/marketingskills",
+    "skills": 53
+  },
+  {
     "repo": "EveryInc/compound-engineering-plugin",
     "title": "EveryInc/compound-engineering-plugin",
     "skills": 46
+  },
+  {
+    "repo": "mattpocock/skills",
+    "title": "Matt's Skills",
+    "skills": 39
   },
   {
     "repo": "qdrant/skills",
@@ -40,14 +60,29 @@
     "skills": 37
   },
   {
-    "repo": "mattpocock/skills",
-    "title": "Matt's Skills",
-    "skills": 36
-  },
-  {
     "repo": "AgriciDaniel/claude-blog",
     "title": "AgriciDaniel/claude-blog",
     "skills": 33
+  },
+  {
+    "repo": "genmedia-labs/skills",
+    "title": "genmedia-labs/skills",
+    "skills": 33
+  },
+  {
+    "repo": "mgifford/accessibility-skills",
+    "title": "mgifford/accessibility-skills",
+    "skills": 33
+  },
+  {
+    "repo": "elastic/agent-skills",
+    "title": "elastic/agent-skills",
+    "skills": 32
+  },
+  {
+    "repo": "akin-ozer/cc-devops-skills",
+    "title": "akin-ozer/cc-devops-skills",
+    "skills": 31
   },
   {
     "repo": "getsentry/skills",
@@ -60,18 +95,8 @@
     "skills": 31
   },
   {
-    "repo": "elastic/agent-skills",
-    "title": "elastic/agent-skills",
-    "skills": 30
-  },
-  {
     "repo": "addyosmani/agent-skills",
     "title": "addyosmani/agent-skills",
-    "skills": 26
-  },
-  {
-    "repo": "huggingface/skills",
-    "title": "huggingface/skills",
     "skills": 26
   },
   {
@@ -82,6 +107,11 @@
   {
     "repo": "expo/skills",
     "title": "expo/skills",
+    "skills": 25
+  },
+  {
+    "repo": "huggingface/skills",
+    "title": "huggingface/skills",
     "skills": 25
   },
   {
@@ -100,8 +130,18 @@
     "skills": 24
   },
   {
+    "repo": "heygen-com/hyperframes",
+    "title": "heygen-com/hyperframes",
+    "skills": 23
+  },
+  {
     "repo": "monte-carlo-data/mc-agent-toolkit",
     "title": "monte-carlo-data/mc-agent-toolkit",
+    "skills": 22
+  },
+  {
+    "repo": "Paramchoudhary/ResumeSkills",
+    "title": "Paramchoudhary/ResumeSkills",
     "skills": 22
   },
   {
@@ -125,6 +165,11 @@
     "skills": 20
   },
   {
+    "repo": "mhattingpete/claude-skills-marketplace",
+    "title": "mhattingpete/claude-skills-marketplace",
+    "skills": 18
+  },
+  {
     "repo": "google-labs-code/stitch-skills",
     "title": "google-labs-code/stitch-skills",
     "skills": 16
@@ -137,7 +182,12 @@
   {
     "repo": "obra/superpowers",
     "title": "Superpowers",
-    "skills": 14
+    "skills": 15
+  },
+  {
+    "repo": "YujxZJCN/teaching-skills",
+    "title": "YujxZJCN/teaching-skills",
+    "skills": 15
   },
   {
     "repo": "redis/agent-skills",
@@ -158,6 +208,16 @@
     "repo": "firecrawl/cli",
     "title": "firecrawl/cli",
     "skills": 13
+  },
+  {
+    "repo": "jananthan30/Resume-Builder",
+    "title": "jananthan30/Resume-Builder",
+    "skills": 13
+  },
+  {
+    "repo": "DietrichGebert/ponytail",
+    "title": "DietrichGebert/ponytail",
+    "skills": 12
   },
   {
     "repo": "vercel-labs/agent-browser",
@@ -220,6 +280,16 @@
     "skills": 8
   },
   {
+    "repo": "yylo-dev/yylo-skills",
+    "title": "yylo-dev/yylo-skills",
+    "skills": 8
+  },
+  {
+    "repo": "AgriciDaniel/claude-email",
+    "title": "AgriciDaniel/claude-email",
+    "skills": 7
+  },
+  {
     "repo": "conorbronsdon/avoid-ai-writing",
     "title": "conorbronsdon/avoid-ai-writing",
     "skills": 7
@@ -227,6 +297,11 @@
   {
     "repo": "Eyadkelleh/awesome-claude-skills-security",
     "title": "Eyadkelleh/awesome-claude-skills-security",
+    "skills": 7
+  },
+  {
+    "repo": "kepano/obsidian-skills",
+    "title": "kepano/obsidian-skills",
     "skills": 7
   },
   {
@@ -240,13 +315,33 @@
     "skills": 7
   },
   {
-    "repo": "better-auth/skills",
-    "title": "better-auth/skills",
+    "repo": "proficientlyjobs/proficiently-claude-skills",
+    "title": "proficientlyjobs/proficiently-claude-skills",
+    "skills": 7
+  },
+  {
+    "repo": "swaylq/sijiao-skill",
+    "title": "swaylq/sijiao-skill",
+    "skills": 7
+  },
+  {
+    "repo": "ahmedasmar/devops-claude-skills",
+    "title": "ahmedasmar/devops-claude-skills",
     "skills": 6
   },
   {
-    "repo": "DietrichGebert/ponytail",
-    "title": "DietrichGebert/ponytail",
+    "repo": "ARPeeketi/claude-resume-kit",
+    "title": "ARPeeketi/claude-resume-kit",
+    "skills": 6
+  },
+  {
+    "repo": "aws-samples/sample-well-architected-skills-and-steering",
+    "title": "aws-samples/sample-well-architected-skills-and-steering",
+    "skills": 6
+  },
+  {
+    "repo": "better-auth/skills",
+    "title": "better-auth/skills",
     "skills": 6
   },
   {
@@ -270,9 +365,29 @@
     "skills": 4
   },
   {
+    "repo": "flowkit-labs/skills",
+    "title": "flowkit-labs/skills",
+    "skills": 3
+  },
+  {
+    "repo": "ndesv21/socialclaw",
+    "title": "ndesv21/socialclaw",
+    "skills": 3
+  },
+  {
     "repo": "vercel-labs/skills",
     "title": "vercel-labs/skills",
     "skills": 3
+  },
+  {
+    "repo": "explorium-ai/vibeprospecting-plugin",
+    "title": "explorium-ai/vibeprospecting-plugin",
+    "skills": 2
+  },
+  {
+    "repo": "JeffLi1993/seo-audit-skill",
+    "title": "JeffLi1993/seo-audit-skill",
+    "skills": 2
   },
   {
     "repo": "squirrelscan/skills",
@@ -282,6 +397,16 @@
   {
     "repo": "supabase/agent-skills",
     "title": "supabase/agent-skills",
+    "skills": 2
+  },
+  {
+    "repo": "SuryaPrakashPandurangi/vscode-extension-builder",
+    "title": "SuryaPrakashPandurangi/vscode-extension-builder",
+    "skills": 2
+  },
+  {
+    "repo": "Xquik-dev/hermes-tweet",
+    "title": "Xquik-dev/hermes-tweet",
     "skills": 2
   },
   {
@@ -295,6 +420,11 @@
     "skills": 1
   },
   {
+    "repo": "airowe/claude-a11y-skill",
+    "title": "airowe/claude-a11y-skill",
+    "skills": 1
+  },
+  {
     "repo": "alonw0/web-asset-generator",
     "title": "alonw0/web-asset-generator",
     "skills": 1
@@ -302,6 +432,21 @@
   {
     "repo": "antonbabenko/terraform-skill",
     "title": "antonbabenko/terraform-skill",
+    "skills": 1
+  },
+  {
+    "repo": "avifenesh/agentsys",
+    "title": "avifenesh/agentsys",
+    "skills": 1
+  },
+  {
+    "repo": "ayghri/i-have-adhd",
+    "title": "ayghri/i-have-adhd",
+    "skills": 1
+  },
+  {
+    "repo": "better-i18n/skills",
+    "title": "better-i18n/skills",
     "skills": 1
   },
   {
@@ -335,6 +480,11 @@
     "skills": 1
   },
   {
+    "repo": "Digidai/product-manager-skills",
+    "title": "Digidai/product-manager-skills",
+    "skills": 1
+  },
+  {
     "repo": "dreamiurg/claude-mountaineering-skills",
     "title": "dreamiurg/claude-mountaineering-skills",
     "skills": 1
@@ -342,6 +492,16 @@
   {
     "repo": "emaynard/claude-family-history-research-skill",
     "title": "emaynard/claude-family-history-research-skill",
+    "skills": 1
+  },
+  {
+    "repo": "imnotStealthy/security-hardening",
+    "title": "imnotStealthy/security-hardening",
+    "skills": 1
+  },
+  {
+    "repo": "jthack/ffuf_claude_skill",
+    "title": "jthack/ffuf_claude_skill",
     "skills": 1
   },
   {
@@ -375,8 +535,18 @@
     "skills": 1
   },
   {
-    "repo": "SuryaPrakashPandurangi/vscode-extension-builder",
-    "title": "SuryaPrakashPandurangi/vscode-extension-builder",
+    "repo": "smerchek/claude-epub-skill",
+    "title": "smerchek/claude-epub-skill",
+    "skills": 1
+  },
+  {
+    "repo": "swaylq/danshari-skill",
+    "title": "swaylq/danshari-skill",
+    "skills": 1
+  },
+  {
+    "repo": "swaylq/ruxi-skill",
+    "title": "swaylq/ruxi-skill",
     "skills": 1
   },
   {
@@ -390,94 +560,34 @@
     "skills": 1
   },
   {
-    "repo": "zarazhangrui/frontend-slides",
-    "title": "zarazhangrui/frontend-slides",
+    "repo": "typefully/agent-skills",
+    "title": "typefully/agent-skills",
     "skills": 1
   },
   {
-    "repo": "AgriciDaniel/claude-email",
-    "title": "AgriciDaniel/claude-email",
-    "skills": null
+    "repo": "Valian/linear-cli-skill",
+    "title": "Valian/linear-cli-skill",
+    "skills": 1
   },
   {
-    "repo": "ahmedasmar/devops-claude-skills",
-    "title": "ahmedasmar/devops-claude-skills",
-    "skills": null
+    "repo": "varunr89/resume-tailoring-skill",
+    "title": "varunr89/resume-tailoring-skill",
+    "skills": 1
   },
   {
-    "repo": "airowe/claude-a11y-skill",
-    "title": "airowe/claude-a11y-skill",
-    "skills": null
+    "repo": "wrsmith108/linear-claude-skill",
+    "title": "wrsmith108/linear-claude-skill",
+    "skills": 1
   },
   {
-    "repo": "akin-ozer/cc-devops-skills",
-    "title": "akin-ozer/cc-devops-skills",
-    "skills": null
+    "repo": "wrsmith108/varlock-claude-skill",
+    "title": "wrsmith108/varlock-claude-skill",
+    "skills": 1
   },
   {
-    "repo": "ARPeeketi/claude-resume-kit",
-    "title": "ARPeeketi/claude-resume-kit",
-    "skills": null
-  },
-  {
-    "repo": "avifenesh/agentsys",
-    "title": "avifenesh/agentsys",
-    "skills": null
-  },
-  {
-    "repo": "aws-samples/sample-well-architected-skills-and-steering",
-    "title": "aws-samples/sample-well-architected-skills-and-steering",
-    "skills": null
-  },
-  {
-    "repo": "ayghri/i-have-adhd",
-    "title": "ayghri/i-have-adhd",
-    "skills": null
-  },
-  {
-    "repo": "better-i18n/skills",
-    "title": "better-i18n/skills",
-    "skills": null
-  },
-  {
-    "repo": "coreyhaines31/marketingskills",
-    "title": "coreyhaines31/marketingskills",
-    "skills": null
-  },
-  {
-    "repo": "Digidai/product-manager-skills",
-    "title": "Digidai/product-manager-skills",
-    "skills": null
-  },
-  {
-    "repo": "explorium-ai/vibeprospecting-plugin",
-    "title": "explorium-ai/vibeprospecting-plugin",
-    "skills": null
-  },
-  {
-    "repo": "flowkit-labs/skills",
-    "title": "flowkit-labs/skills",
-    "skills": null
-  },
-  {
-    "repo": "genmedia-labs/skills",
-    "title": "genmedia-labs/skills",
-    "skills": null
-  },
-  {
-    "repo": "heygen-com/hyperframes",
-    "title": "heygen-com/hyperframes",
-    "skills": null
-  },
-  {
-    "repo": "imnotStealthy/security-hardening",
-    "title": "imnotStealthy/security-hardening",
-    "skills": null
-  },
-  {
-    "repo": "jananthan30/Resume-Builder",
-    "title": "jananthan30/Resume-Builder",
-    "skills": null
+    "repo": "zarazhangrui/frontend-slides",
+    "title": "zarazhangrui/frontend-slides",
+    "skills": 1
   },
   {
     "repo": "javiera-vasquez/claude-code-job-tailor",
@@ -485,128 +595,8 @@
     "skills": null
   },
   {
-    "repo": "JeffLi1993/seo-audit-skill",
-    "title": "JeffLi1993/seo-audit-skill",
-    "skills": null
-  },
-  {
-    "repo": "jthack/ffuf_claude_skill",
-    "title": "jthack/ffuf_claude_skill",
-    "skills": null
-  },
-  {
-    "repo": "kepano/obsidian-skills",
-    "title": "kepano/obsidian-skills",
-    "skills": null
-  },
-  {
-    "repo": "MemoAsh/agent-workflow-pack",
-    "title": "MemoAsh/agent-workflow-pack",
-    "skills": null
-  },
-  {
-    "repo": "mgifford/accessibility-skills",
-    "title": "mgifford/accessibility-skills",
-    "skills": null
-  },
-  {
-    "repo": "mhattingpete/claude-skills-marketplace",
-    "title": "mhattingpete/claude-skills-marketplace",
-    "skills": null
-  },
-  {
-    "repo": "ndesv21/socialclaw",
-    "title": "ndesv21/socialclaw",
-    "skills": null
-  },
-  {
-    "repo": "Orchestra-Research/AI-research-SKILLs",
-    "title": "Orchestra-Research/AI-research-SKILLs",
-    "skills": null
-  },
-  {
-    "repo": "Paramchoudhary/ResumeSkills",
-    "title": "Paramchoudhary/ResumeSkills",
-    "skills": null
-  },
-  {
-    "repo": "proficientlyjobs/proficiently-claude-skills",
-    "title": "proficientlyjobs/proficiently-claude-skills",
-    "skills": null
-  },
-  {
-    "repo": "replicate/skills",
-    "title": "replicate/skills",
-    "skills": null
-  },
-  {
-    "repo": "smerchek/claude-epub-skill",
-    "title": "smerchek/claude-epub-skill",
-    "skills": null
-  },
-  {
-    "repo": "swaylq/danshari-skill",
-    "title": "swaylq/danshari-skill",
-    "skills": null
-  },
-  {
-    "repo": "swaylq/ruxi-skill",
-    "title": "swaylq/ruxi-skill",
-    "skills": null
-  },
-  {
-    "repo": "swaylq/sijiao-skill",
-    "title": "swaylq/sijiao-skill",
-    "skills": null
-  },
-  {
-    "repo": "trailofbits/skills",
-    "title": "trailofbits/skills",
-    "skills": null
-  },
-  {
-    "repo": "typefully/agent-skills",
-    "title": "typefully/agent-skills",
-    "skills": null
-  },
-  {
-    "repo": "Valian/linear-cli-skill",
-    "title": "Valian/linear-cli-skill",
-    "skills": null
-  },
-  {
-    "repo": "varunr89/resume-tailoring-skill",
-    "title": "varunr89/resume-tailoring-skill",
-    "skills": null
-  },
-  {
     "repo": "vercel-labs/next-skills",
     "title": "vercel-labs/next-skills",
-    "skills": null
-  },
-  {
-    "repo": "wrsmith108/linear-claude-skill",
-    "title": "wrsmith108/linear-claude-skill",
-    "skills": null
-  },
-  {
-    "repo": "wrsmith108/varlock-claude-skill",
-    "title": "wrsmith108/varlock-claude-skill",
-    "skills": null
-  },
-  {
-    "repo": "Xquik-dev/hermes-tweet",
-    "title": "Xquik-dev/hermes-tweet",
-    "skills": null
-  },
-  {
-    "repo": "YujxZJCN/teaching-skills",
-    "title": "YujxZJCN/teaching-skills",
-    "skills": null
-  },
-  {
-    "repo": "yylo-dev/yylo-skills",
-    "title": "yylo-dev/yylo-skills",
     "skills": null
   }
 ]

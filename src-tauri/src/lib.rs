@@ -816,6 +816,32 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // Fork: search index + semantic categories, in their own cache DB
+            // next to the library (see core::semantic).
+            {
+                let semantic = core::semantic::SemanticDb::open(
+                    &core::central_repo::base_dir().join(core::semantic::DB_FILE),
+                )
+                .or_else(|e| {
+                    log::warn!("semantic index unavailable, using memory: {e}");
+                    core::semantic::SemanticDb::open_in_memory()
+                })?;
+                app.manage(semantic);
+                // The bundled model sits in the resource dir; dev builds fall
+                // back to the fetched copy in the source tree.
+                let model_dir = app
+                    .path()
+                    .resolve("minilm", tauri::path::BaseDirectory::Resource)
+                    .ok()
+                    .filter(|d| d.join("model.safetensors").is_file())
+                    .unwrap_or_else(|| {
+                        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/minilm")
+                    });
+                app.manage(core::semantic::worker::Worker::start(
+                    app.handle().clone(),
+                    model_dir,
+                ));
+            }
             // Snapshot the builder->setup gap BEFORE doing any work in setup,
             // so the label reflects only the time Tauri spent constructing
             // the App between Builder::default() and invoking this callback.
@@ -1040,6 +1066,14 @@ pub fn run() {
             commands::skills::batch_import_folder,
             commands::share::export_skills_archive,
             commands::share::import_skills_archive,
+            commands::authoring::create_skill,
+            commands::authoring::save_skill_document,
+            commands::semantic::search_library,
+            commands::semantic::list_categories,
+            commands::semantic::category_assignments,
+            commands::semantic::save_category,
+            commands::semantic::delete_category,
+            commands::semantic::categorize_items,
             // Sync
             commands::sync::sync_skill_to_tool,
             commands::sync::unsync_skill_from_tool,

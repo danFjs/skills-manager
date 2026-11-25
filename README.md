@@ -21,14 +21,42 @@ features, install instructions and documentation.
   and replaced by links to it. Originals are copied to `adopt-backups/` in
   the library folder first. Toggle it, or run it on demand, under
   **Settings → Library**.
-- **Skill collections in Git install.** The Git tab of Install Skills lists
-  122 GitHub repositories that publish skills; picking one opens the normal
-  preview to choose which skills to install.
+- **Create and edit skills.** A **Create skill** button (My Skills and
+  Install Skills) writes a new `SKILL.md` from a template, can link it to
+  agents right away, and opens it in an editor. Any library skill's
+  `SKILL.md` can be edited from its detail panel; agents holding copies are
+  refreshed on save.
+- **Ranked search on My Skills.** Covers names, descriptions, the full
+  `SKILL.md` text, tags and source; tolerates typos and partial words; takes
+  `tag:` / `source:` filters.
+- **Semantic categories.** Skills are sorted into 13 editable categories
+  (plus "Other") by a small on-device embedding model (all-MiniLM-L6-v2,
+  bundled — nothing leaves the machine). Each category's description is what
+  skills are matched against. Category chips filter My Skills, the
+  Leaderboard, the Collections tab and the Git install preview. Index and
+  vectors are cached in `semantic.db` in the library folder.
+- **Collections tab in Install Skills.** Every skill (about 2,900) from 120
+  curated GitHub repositories, each with its description, category,
+  search and a one-click install. The repositories themselves are listed on
+  the Git tab. Both ship with the app (`src/data/`); refresh them with
+  `scripts/build-skill-catalog.mjs`.
+- **Descriptions on the Leaderboard.** skills.sh lists names only; the app
+  ships descriptions for about 90% of the leaderboard skills, read from their
+  repositories' `SKILL.md`.
+- **New icon**, and bigger skill cards in Install Skills.
 - **No app update checks.** The in-app updater and the startup check against
   the original's GitHub releases are removed.
 - **English only.** Other UI languages and the Chinese README/CHANGELOG are
   removed.
 - **CLI:** the `git` subcommand (backup) is removed.
+- **Larger download:** the bundled model adds about 90 MB.
+
+## Building
+
+```bash
+npm install
+npm run tauri build   # fetches the pinned embedding model first (~90 MB)
+```
 
 No telemetry was found in the original; none is added.
 

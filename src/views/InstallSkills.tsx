@@ -15,16 +15,24 @@ import {
   FolderInput,
   ExternalLink,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Search,
   X,
   MoreHorizontal,
   Pencil,
   Calendar,
+  Library,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SkillRepoCollections } from "../components/SkillRepoCollections";
+import { CategoryPills } from "../components/CategoryPills";
+import { CategoriesDialog } from "../components/CategoriesDialog";
+import { CollectionSkills } from "../components/CollectionSkills";
+import { Pager } from "../components/Pager";
+import { CreateSkillDialog } from "../components/CreateSkillDialog";
+import { SkillEditorDialog } from "../components/SkillEditorDialog";
+import { leaderboardDescription, loadLeaderboardDescriptions } from "../lib/skillCatalog";
+import { useCategories } from "../hooks/useCategories";
+import { useItemCategories } from "../hooks/useItemCategories";
 import { toast } from "sonner";
 import { cn } from "../utils";
 import { useApp } from "../context/AppContext";
@@ -51,10 +59,29 @@ export function InstallSkills() {
   const { refreshPresets, refreshManagedSkills, managedSkills, openSkillDetailById } = useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"market" | "local" | "git">("market");
+  const [activeTab, setActiveTab] = useState<"market" | "collections" | "local" | "git">("market");
   const [marketTab, setMarketTab] = useState<"hot" | "trending" | "alltime">("alltime");
   const [marketQuery, setMarketQuery] = useState("");
   const [marketSourceFilter, setMarketSourceFilter] = useState("all");
+  // Fork: semantic categories for skills you could install.
+  const semantic = useCategories();
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [marketCategory, setMarketCategory] = useState<string | null>(null);
+  const [gitCategory, setGitCategory] = useState<string | null>(null);
+  const [creatingSkill, setCreatingSkill] = useState(false);
+  const [editingNew, setEditingNew] = useState<{ id: string; name: string } | null>(null);
+  // Descriptions for marketplace entries (skills.sh lists names only),
+  // taken from the bundled collections catalog where the skill appears.
+  const [catalogDescriptions, setCatalogDescriptions] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    loadLeaderboardDescriptions().then(setCatalogDescriptions).catch(() => {});
+  }, []);
+  const marketDescription = (skill: { source: string; name: string; skill_id: string }) =>
+    leaderboardDescription(catalogDescriptions, skill);
+  const installedNames = useMemo(
+    () => new Set(managedSkills.map((s) => s.name.toLowerCase())),
+    [managedSkills],
+  );
   const [marketSkills, setMarketSkills] = useState<SkillsShSkill[]>([]);
   const [marketPage, setMarketPage] = useState(1);
   const [marketSearchLimit, setMarketSearchLimit] = useState(MARKET_SEARCH_STEP);
@@ -185,12 +212,12 @@ export function InstallSkills() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "market" || tab === "local" || tab === "git") {
+    if (tab === "market" || tab === "collections" || tab === "local" || tab === "git") {
       setActiveTab(tab);
     }
   }, [searchParams]);
 
-  const switchTab = (tab: "market" | "local" | "git") => {
+  const switchTab = (tab: "market" | "collections" | "local" | "git") => {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
@@ -503,6 +530,7 @@ export function InstallSkills() {
       toast.dismiss(toastId);
       setGitPreview(preview);
       setGitPreviewRepoUrl(url);
+      setGitCategory(null);
       setGitSelections(preview.skills.map((s) => ({
         rel_path: s.rel_path,
         name: s.name,
@@ -674,7 +702,7 @@ export function InstallSkills() {
     return () => observer.disconnect();
   }, [computeVisibleCount]);
 
-  const filteredMarketSkills = useMemo(() => {
+  const sourceFilteredMarketSkills = useMemo(() => {
     const filtered = marketSourceFilter === "all"
       ? marketSkills
       : marketSkills.filter((skill) => skill.source === marketSourceFilter);
@@ -684,6 +712,55 @@ export function InstallSkills() {
     return filtered;
   }, [marketSkills, marketSourceFilter, debouncedMarketQuery]);
 
+  // skills.sh lists names only, so that is what gets categorized.
+  const marketItems = useMemo(
+    () =>
+      sourceFilteredMarketSkills.map((skill) => ({
+        key: skill.id,
+        text: `${skill.name.replace(/[-_]/g, " ")}. ${marketDescription(skill) ?? ""}`.trim(),
+      })),
+    // marketDescription reads catalogDescriptions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sourceFilteredMarketSkills, catalogDescriptions],
+  );
+  const marketCategories = useItemCategories(marketItems);
+  const marketCategoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const skill of sourceFilteredMarketSkills) {
+      const c = marketCategories[skill.id];
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return counts;
+  }, [sourceFilteredMarketSkills, marketCategories]);
+  const filteredMarketSkills = useMemo(
+    () =>
+      marketCategory
+        ? sourceFilteredMarketSkills.filter((skill) => marketCategories[skill.id] === marketCategory)
+        : sourceFilteredMarketSkills,
+    [sourceFilteredMarketSkills, marketCategories, marketCategory],
+  );
+
+  const gitItems = useMemo(
+    () =>
+      gitSelections.map((s) => ({
+        key: s.rel_path,
+        text: `${s.name.replace(/[-_]/g, " ")}. ${s.description ?? ""}`.trim(),
+      })),
+    [gitSelections],
+  );
+  const gitCategories = useItemCategories(gitItems);
+  const gitCategoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of gitSelections) {
+      const c = gitCategories[s.rel_path];
+      if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return counts;
+  }, [gitSelections, gitCategories]);
+  const shownGitSelections = gitCategory
+    ? gitSelections.filter((s) => gitCategories[s.rel_path] === gitCategory)
+    : gitSelections;
+
   const totalMarketPages = Math.max(1, Math.ceil(filteredMarketSkills.length / MARKET_PAGE_SIZE));
   const currentMarketPage = Math.min(marketPage, totalMarketPages);
   const marketPageStart = (currentMarketPage - 1) * MARKET_PAGE_SIZE;
@@ -691,14 +768,6 @@ export function InstallSkills() {
     marketPageStart,
     marketPageStart + MARKET_PAGE_SIZE
   );
-  const visibleMarketPages = Array.from(
-    { length: totalMarketPages },
-    (_, index) => index + 1
-  ).filter((page) => {
-    if (totalMarketPages <= 7) return true;
-    if (page === 1 || page === totalMarketPages) return true;
-    return Math.abs(page - currentMarketPage) <= 1;
-  });
   const hasMarketQuery = debouncedMarketQuery.trim().length > 0;
   const canLoadMoreSearch = hasMarketQuery && marketSkills.length >= marketSearchLimit;
   const isLoadingMoreSearch = hasMarketQuery && marketLoadingMore;
@@ -732,10 +801,21 @@ export function InstallSkills() {
   return (
     <div className="app-page gap-4">
       <div className="app-page-header border-b-0 pb-0">
-        <h1 className="app-page-title mb-4">{t("install.title")}</h1>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h1 className="app-page-title">{t("install.title")}</h1>
+          <button
+            type="button"
+            onClick={() => setCreatingSkill(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-accent-border bg-accent-dark px-3 py-2 text-[13px] font-medium text-white transition-colors hover:bg-accent"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("authoring.createButton")}
+          </button>
+        </div>
         <div className="flex gap-1 border-b border-border-subtle">
           {[
             { id: "market" as const, label: t("install.browseMarket"), icon: Box },
+            { id: "collections" as const, label: t("install.collectionsTab"), icon: Library },
             { id: "local" as const, label: t("install.localInstall"), icon: UploadCloud },
             { id: "git" as const, label: t("install.gitInstall"), icon: Github },
           ].map((tab) => {
@@ -1011,6 +1091,20 @@ export function InstallSkills() {
           ) : (
             <div className="pb-8">
               <div ref={marketListRef} className="scroll-mt-4" />
+              {semantic.categories.length > 0 && marketCategoryCounts.size > 0 && (
+                <CategoryPills
+                  categories={semantic.categories}
+                  counts={marketCategoryCounts}
+                  selected={marketCategory}
+                  onSelect={(category) => {
+                    setMarketCategory(category);
+                    setMarketPage(1);
+                  }}
+                  onEdit={() => setCategoriesOpen(true)}
+                  progress={semantic.progress}
+                  className="mb-3"
+                />
+              )}
 
               {filteredMarketSkills.length === 0 ? (
                 <div className="app-panel flex flex-col items-center justify-center rounded-xl px-6 py-14 text-center">
@@ -1026,7 +1120,7 @@ export function InstallSkills() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {paginatedMarketSkills.map((skill) => {
                       const displayName = skill.name || skill.skill_id;
                       const showSkillId = skill.skill_id.trim() !== displayName.trim();
@@ -1038,7 +1132,7 @@ export function InstallSkills() {
                       return (
                       <div
                         key={skill.id}
-                        className="app-panel flex flex-col gap-2 p-3 transition-colors hover:border-border"
+                        className="app-panel flex min-h-[148px] flex-col gap-2.5 p-4 transition-colors hover:border-border"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1102,6 +1196,11 @@ export function InstallSkills() {
                           </div>
                         </div>
 
+                        {marketDescription(skill) && (
+                          <p className="line-clamp-3 text-[13px] leading-5 text-muted">
+                            {marketDescription(skill)}
+                          </p>
+                        )}
                         <div className="flex flex-wrap items-center gap-1">
                           <button
                             type="button"
@@ -1139,49 +1238,7 @@ export function InstallSkills() {
                     })}
                   </div>
 
-                  {totalMarketPages > 1 ? (
-                    <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => changeMarketPage(Math.max(1, currentMarketPage - 1))}
-                        disabled={currentMarketPage === 1}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                        {t("install.pagination.previous")}
-                      </button>
-
-                      {visibleMarketPages.map((page, index) => {
-                        const previousPage = visibleMarketPages[index - 1];
-                        const showGap = previousPage && page - previousPage > 1;
-
-                        return (
-                          <div key={page} className="flex items-center gap-1.5">
-                            {showGap ? <span className="px-1 text-[13px] text-faint">...</span> : null}
-                            <button
-                              onClick={() => changeMarketPage(page)}
-                              className={cn(
-                                "min-w-8 rounded-lg border px-2.5 py-1.5 text-[13px] font-semibold transition-colors",
-                                page === currentMarketPage
-                                  ? "border-accent-border bg-accent-dark text-white"
-                                  : "border-border-subtle bg-surface text-secondary hover:bg-surface-hover"
-                              )}
-                            >
-                              {page}
-                            </button>
-                          </div>
-                        );
-                      })}
-
-                      <button
-                        onClick={() => changeMarketPage(Math.min(totalMarketPages, currentMarketPage + 1))}
-                        disabled={currentMarketPage === totalMarketPages}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-[13px] font-medium text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
-                      >
-                        {t("install.pagination.next")}
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ) : null}
+                  <Pager current={currentMarketPage} total={totalMarketPages} onChange={changeMarketPage} />
 
                   {hasMarketQuery ? (
                     <div className="mt-4 flex justify-center">
@@ -1529,6 +1586,40 @@ export function InstallSkills() {
         </div>
       )}
 
+      {activeTab === "collections" && (
+        <CollectionSkills
+          categories={semantic.categories}
+          progress={semantic.progress}
+          onEditCategories={() => setCategoriesOpen(true)}
+          installedNames={installedNames}
+          onInstall={(url) => handleGitPreview(url)}
+          busy={gitLoading}
+        />
+      )}
+
+      <CreateSkillDialog
+        open={creatingSkill}
+        onClose={() => setCreatingSkill(false)}
+        onCreated={(skill) => {
+          setCreatingSkill(false);
+          setEditingNew({ id: skill.id, name: skill.name });
+        }}
+      />
+      <SkillEditorDialog
+        skillId={editingNew?.id ?? null}
+        skillName={editingNew?.name}
+        sourceType="local"
+        onClose={() => setEditingNew(null)}
+      />
+
+      <CategoriesDialog
+        open={categoriesOpen}
+        categories={semantic.categories}
+        onClose={() => setCategoriesOpen(false)}
+        onSave={semantic.save}
+        onDelete={semantic.remove}
+      />
+
       {/* Git preview / selection dialog */}
       {gitPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1570,11 +1661,23 @@ export function InstallSkills() {
               </button>
             </div>
 
+            {semantic.categories.length > 0 && gitCategoryCounts.size > 1 && (
+              <CategoryPills
+                categories={semantic.categories}
+                counts={gitCategoryCounts}
+                selected={gitCategory}
+                onSelect={setGitCategory}
+                onEdit={() => setCategoriesOpen(true)}
+                progress={semantic.progress}
+                className="mb-2"
+              />
+            )}
+
             {gitSelections.length === 0 ? (
               <p className="py-6 text-center text-[13px] text-muted">{t("install.gitPreview.empty")}</p>
             ) : (
               <div className="max-h-64 space-y-2 overflow-y-auto scrollbar-hide pr-1">
-                {gitSelections.map((item, idx) => (
+                {shownGitSelections.map((item) => (
                   <div
                     key={item.rel_path}
                     className={cn(
@@ -1590,7 +1693,7 @@ export function InstallSkills() {
                       disabled={gitConfirmLoading}
                       onChange={(e) =>
                         setGitSelections((prev) =>
-                          prev.map((s, i) => i === idx ? { ...s, selected: e.target.checked } : s)
+                          prev.map((s) => s.rel_path === item.rel_path ? { ...s, selected: e.target.checked } : s)
                         )
                       }
                       className="h-4 w-4 shrink-0 accent-accent"
@@ -1601,7 +1704,7 @@ export function InstallSkills() {
                         value={item.name}
                         onChange={(e) =>
                           setGitSelections((prev) =>
-                            prev.map((s, i) => i === idx ? { ...s, name: e.target.value } : s)
+                            prev.map((s) => s.rel_path === item.rel_path ? { ...s, name: e.target.value } : s)
                           )
                         }
                         disabled={!item.selected || gitConfirmLoading}

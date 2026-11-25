@@ -287,3 +287,28 @@ mod tests {
         assert_eq!(skills[0].id, "openai/skills/playwright");
     }
 }
+
+/// Writes every skill on the three skills.sh boards to the path in
+/// `SKILLSSH_DUMP` (used by scripts/build-skill-catalog.mjs to fetch their
+/// descriptions):
+/// `SKILLSSH_DUMP=/tmp/boards.json cargo test dump_leaderboards -- --ignored`
+#[cfg(test)]
+mod dump {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn dump_leaderboards() {
+        let out = std::env::var("SKILLSSH_DUMP").expect("set SKILLSSH_DUMP");
+        let mut all = Vec::new();
+        for board in [LeaderboardType::AllTime, LeaderboardType::Trending, LeaderboardType::Hot] {
+            all.extend(fetch_leaderboard(board, None).unwrap());
+        }
+        let rows: Vec<_> = all
+            .iter()
+            .map(|s| serde_json::json!({ "source": s.source, "skill_id": s.skill_id, "name": s.name }))
+            .collect();
+        std::fs::write(&out, serde_json::to_string(&rows).unwrap()).unwrap();
+        println!("{} entries", rows.len());
+    }
+}

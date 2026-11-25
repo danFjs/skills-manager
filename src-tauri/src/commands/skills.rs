@@ -360,8 +360,11 @@ static GET_MANAGED_SKILLS_FIRST_CALL: AtomicBool = AtomicBool::new(true);
 
 #[tauri::command]
 pub async fn get_managed_skills(
+    app: tauri::AppHandle,
     store: State<'_, Arc<SkillStore>>,
 ) -> Result<Vec<ManagedSkillDto>, AppError> {
+    // The library may have changed: let search/categories catch up.
+    crate::core::semantic::worker::kick(&app);
     let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let start = Instant::now();
